@@ -66,6 +66,20 @@ export const TOKEN_DECIMALS = {
 // Target balance contract address
 export const TARGET_BALANCE_CONTRACT_ADDRESS = '0x6d07A415B32c73362DC44c205B47485cCCfFdE4e';
 
+// PnL contract address
+export const PNL_CONTRACT_ADDRESS = '0x22c23082914f60E4BAd2D6d0431f387Aa4Be7B6d';
+
+// PnL contract ABI
+export const PNL_CONTRACT_ABI = [
+  {
+    inputs: [],
+    name: 'pnl',
+    outputs: [{ internalType: 'int256', name: '', type: 'int256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
 // Aggregator addresses
 export const AGGREGATORS = {
   kyberSwap: '0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0',
@@ -87,6 +101,10 @@ export function getContract(provider) {
 
 export function getTargetBalanceContract(provider) {
   return new ethers.Contract(TARGET_BALANCE_CONTRACT_ADDRESS, TARGET_BALANCE_CONTRACT_ABI, provider);
+}
+
+export function getPnLContract(provider) {
+  return new ethers.Contract(PNL_CONTRACT_ADDRESS, PNL_CONTRACT_ABI, provider);
 }
 
 // ERC20 ABI for balanceOf

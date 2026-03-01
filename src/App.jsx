@@ -5,6 +5,7 @@ import {
   getProvider, 
   getContract, 
   getTargetBalanceContract,
+  getPnLContract,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -23,6 +24,7 @@ function App() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [walletValue, setWalletValue] = useState(null);
   const [tokenBalances, setTokenBalances] = useState(null);
+  const [pnl, setPnl] = useState(null);
 
   useEffect(() => {
     fetchVolumeData();
@@ -167,6 +169,20 @@ function App() {
       }
       
       setTokenBalances(balanceData);
+
+      // Fetch PnL
+      try {
+        const pnlContract = getPnLContract(provider);
+        const pnlValue = await pnlContract.pnl();
+        // Convert int256 to number and divide by 1e36
+        const pnlBigInt = typeof pnlValue === 'bigint' ? pnlValue : BigInt(pnlValue.toString());
+        const pnlNumber = Number(pnlBigInt) / 1e36;
+        setPnl(pnlNumber);
+        console.log('PnL value:', pnlNumber);
+      } catch (error) {
+        console.error('Error fetching PnL:', error);
+        setPnl(null);
+      }
 
       // Fetch volume data for all combinations
       const volumeData = {};
@@ -403,6 +419,30 @@ function App() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+        
+        {/* PnL Display */}
+        {pnl !== null && (
+          <div className="pnl-card">
+            <div className="pnl-content">
+              <span className="pnl-label">PnL since block 42784272:</span>
+              <span className={`pnl-value ${pnl >= 0 ? 'positive' : 'negative'}`}>
+                {pnl >= 0 ? '+' : ''}{pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {/* PnL Display */}
+        {pnl !== null && (
+          <div className="pnl-card">
+            <div className="pnl-content">
+              <span className="pnl-label">PnL since block 42784272:</span>
+              <span className={`pnl-value ${pnl >= 0 ? 'positive' : 'negative'}`}>
+                {pnl >= 0 ? '+' : ''}{pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
         )}
