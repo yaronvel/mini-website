@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { StatsTable } from './components/StatsTable';
 import { 
   getProvider, 
   getContract, 
+  getTargetBalanceContract,
   TOKENS, 
+  TOKEN_DECIMALS,
   AGGREGATORS,
-  USDC_DIVISOR 
+  USDC_DIVISOR,
+  ERC20_ABI
 } from './utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from './utils/blockUtils';
 import './App.css';
@@ -18,6 +22,7 @@ function App() {
   const [currentTimestamp, setCurrentTimestamp] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [walletValue, setWalletValue] = useState(null);
+  const [tokenBalances, setTokenBalances] = useState(null);
 
   useEffect(() => {
     fetchVolumeData();
@@ -97,6 +102,71 @@ function App() {
         change24h: change24h,
         timeSinceFirst: blocks.timeSinceFirst
       });
+
+      // Get wallet address
+      let walletAddress;
+      try {
+        walletAddress = await contract.wallet();
+        console.log('Wallet address retrieved:', walletAddress);
+      } catch (error) {
+        console.error('Error getting wallet address:', error);
+        throw error;
+      }
+      
+      // Get target balance contract
+      const targetBalanceContract = getTargetBalanceContract(provider);
+      
+      // Fetch token balances and target balances
+      const balanceData = {};
+      
+      for (const [tokenName, tokenAddress] of Object.entries(TOKENS)) {
+        try {
+          // Get token contract
+          const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+          
+          // Get balance and target balance in parallel
+          const [balance, targetBalance] = await Promise.all([
+            tokenContract.balanceOf(walletAddress).catch((e) => {
+              console.warn(`Error getting balance for ${tokenName}:`, e);
+              return 0n;
+            }),
+            targetBalanceContract.tokenTargetBalance(tokenAddress).catch((e) => {
+              console.warn(`Error getting target balance for ${tokenName}:`, e);
+              return 0n;
+            })
+          ]);
+          
+          const decimals = TOKEN_DECIMALS[tokenName];
+          const divisor = 10n ** BigInt(decimals);
+          
+          // Convert BigInt to number properly
+          const balanceBigInt = typeof balance === 'bigint' ? balance : BigInt(balance.toString());
+          const targetBigInt = typeof targetBalance === 'bigint' ? targetBalance : BigInt(targetBalance.toString());
+          
+          const balanceNumber = Number(balanceBigInt) / Number(divisor);
+          const targetNumber = Number(targetBigInt) / Number(divisor);
+          const percentage = targetNumber > 0 ? (balanceNumber / targetNumber) * 100 : 0;
+          
+          console.log(`${tokenName} balance:`, balanceNumber, 'target:', targetNumber, 'percentage:', percentage);
+          
+          balanceData[tokenName] = {
+            balance: balanceNumber,
+            target: targetNumber,
+            percentage: percentage,
+            balanceRaw: balanceBigInt.toString(),
+            targetRaw: targetBigInt.toString()
+          };
+        } catch (error) {
+          console.error(`Error fetching balance for ${tokenName}:`, error);
+          balanceData[tokenName] = {
+            balance: 0,
+            target: 0,
+            percentage: 0
+          };
+        }
+      }
+      
+      setTokenBalances(balanceData);
 
       // Fetch volume data for all combinations
       const volumeData = {};
@@ -282,6 +352,57 @@ function App() {
                   </span>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        
+        {/* Token Balances Display */}
+        {tokenBalances && (
+          <div className="token-balances-card">
+            <h3 className="token-balances-title">Token Balances</h3>
+            <div className="token-balances-grid">
+              {Object.entries(tokenBalances).map(([tokenName, data]) => {
+                const tokenDisplayName = tokenName === 'sol' ? 'SOL' : tokenName.toUpperCase();
+                return (
+                  <div key={tokenName} className="token-balance-item">
+                    <div className="token-balance-header">
+                      <span className="token-balance-name">{tokenDisplayName}</span>
+                      <span className="token-balance-percentage">
+                        {data.percentage.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="token-balance-details">
+                      <div className="token-balance-row">
+                        <span className="token-balance-label">Balance:</span>
+                        <span className="token-balance-value">
+                          {data.balance.toLocaleString('en-US', { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 6 
+                          })}
+                        </span>
+                      </div>
+                      <div className="token-balance-row">
+                        <span className="token-balance-label">Target:</span>
+                        <span className="token-balance-value">
+                          {data.target.toLocaleString('en-US', { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 6 
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="token-balance-progress-bar">
+                      <div 
+                        className="token-balance-progress-fill"
+                        style={{ 
+                          width: `${Math.min(data.percentage, 100)}%`,
+                          backgroundColor: data.percentage >= 100 ? '#22c55e' : data.percentage >= 50 ? '#f59e0b' : '#ef4444'
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

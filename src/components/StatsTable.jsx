@@ -61,7 +61,7 @@ export function StatsTable({ stats, loading }) {
                 const kyber1h = tokenStats.kyberSwap?.oneHour || '0';
                 const zeroX1h = tokenStats.zeroX?.oneHour || '0';
                 const total1h = (BigInt(kyber1h) + BigInt(zeroX1h)).toString();
-                const displayName = tokenName === 'token3' ? 'SOL' : tokenName.toUpperCase();
+                const displayName = tokenName === 'sol' ? 'SOL' : tokenName.toUpperCase();
 
                 return (
                   <tr key={tokenName}>
@@ -94,8 +94,8 @@ export function StatsTable({ stats, loading }) {
                 const aggStats = stats.perAggregator[aggName] || {};
                 const weth1h = aggStats.weth?.oneHour || '0';
                 const cbbtc1h = aggStats.cbbtc?.oneHour || '0';
-                const token31h = aggStats.token3?.oneHour || '0';
-                const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(token31h)).toString();
+                const sol1h = aggStats.sol?.oneHour || '0';
+                const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(sol1h)).toString();
 
                 return (
                   <tr key={aggName}>
@@ -104,7 +104,7 @@ export function StatsTable({ stats, loading }) {
                     </td>
                     <td>${formatVolume(weth1h)}</td>
                     <td>${formatVolume(cbbtc1h)}</td>
-                    <td>${formatVolume(token31h)}</td>
+                    <td>${formatVolume(sol1h)}</td>
                     <td className="total-cell">${formatVolume(total1h)}</td>
                   </tr>
                 );
@@ -146,7 +146,7 @@ export function StatsTable({ stats, loading }) {
                 const kyber24h = tokenStats.kyberSwap?.twentyFourHours || '0';
                 const zeroX24h = tokenStats.zeroX?.twentyFourHours || '0';
                 const total24h = (BigInt(kyber24h) + BigInt(zeroX24h)).toString();
-                const displayName = tokenName === 'token3' ? 'SOL' : tokenName.toUpperCase();
+                const displayName = tokenName === 'sol' ? 'SOL' : tokenName.toUpperCase();
 
                 return (
                   <tr key={tokenName}>
@@ -179,8 +179,8 @@ export function StatsTable({ stats, loading }) {
                 const aggStats = stats.perAggregator[aggName] || {};
                 const weth24h = aggStats.weth?.twentyFourHours || '0';
                 const cbbtc24h = aggStats.cbbtc?.twentyFourHours || '0';
-                const token324h = aggStats.token3?.twentyFourHours || '0';
-                const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(token324h)).toString();
+                const sol24h = aggStats.sol?.twentyFourHours || '0';
+                const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(sol24h)).toString();
 
                 return (
                   <tr key={aggName}>
@@ -189,7 +189,7 @@ export function StatsTable({ stats, loading }) {
                     </td>
                     <td>${formatVolume(weth24h)}</td>
                     <td>${formatVolume(cbbtc24h)}</td>
-                    <td>${formatVolume(token324h)}</td>
+                    <td>${formatVolume(sol24h)}</td>
                     <td className="total-cell">${formatVolume(total24h)}</td>
                   </tr>
                 );

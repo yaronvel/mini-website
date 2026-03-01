@@ -137,6 +137,133 @@
   color: #ef4444;
 }
 
+.token-balances-card {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(100, 108, 255, 0.1) 0%, rgba(83, 91, 242, 0.1) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(100, 108, 255, 0.2);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balances-card {
+    background: linear-gradient(135deg, rgba(100, 108, 255, 0.05) 0%, rgba(83, 91, 242, 0.05) 100%);
+    border-color: rgba(100, 108, 255, 0.1);
+  }
+}
+
+.token-balances-title {
+  font-size: 1.5rem;
+  margin: 0 0 1.5rem 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balances-title {
+    color: rgba(0, 0, 0, 0.9);
+  }
+}
+
+.token-balances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.token-balance-item {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balance-item {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+.token-balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.token-balance-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #646cff;
+}
+
+.token-balance-percentage {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balance-percentage {
+    color: rgba(0, 0, 0, 0.9);
+  }
+}
+
+.token-balance-details {
+  margin-bottom: 0.75rem;
+}
+
+.token-balance-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.token-balance-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balance-label {
+    color: rgba(0, 0, 0, 0.7);
+  }
+}
+
+.token-balance-value {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balance-value {
+    color: rgba(0, 0, 0, 0.9);
+  }
+}
+
+.token-balance-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balance-progress-bar {
+    background: rgba(0, 0, 0, 0.1);
+  }
+}
+
+.token-balance-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
 .block-info {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.9rem;

@@ -8,7 +8,7 @@ export const BASE_RPC_URL = import.meta.env.VITE_INFURA_URL || 'https://base-mai
 export const FIRST_BLOCK = 42784272;
 export const BLOCK_TIME_SECONDS = 2;
 
-// Contract ABI - volume and getWalletValue functions
+// Contract ABI - volume, getWalletValue, and wallet functions
 export const CONTRACT_ABI = [
   {
     inputs: [
@@ -26,6 +26,24 @@ export const CONTRACT_ABI = [
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'wallet',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+// Target balance contract ABI
+export const TARGET_BALANCE_CONTRACT_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'tokenTargetBalance',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ];
 
@@ -33,8 +51,20 @@ export const CONTRACT_ABI = [
 export const TOKENS = {
   weth: '0x4200000000000000000000000000000000000006',
   cbbtc: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
-  token3: '0x311935Cd80B76769bF2ecC9D8Ab7635b2139cf82'
+  sol: '0x311935Cd80B76769bF2ecC9D8Ab7635b2139cf82',
+  usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' // Base USDC
 };
+
+// Token decimals
+export const TOKEN_DECIMALS = {
+  weth: 18,
+  cbbtc: 8,
+  sol: 9,
+  usdc: 6
+};
+
+// Target balance contract address
+export const TARGET_BALANCE_CONTRACT_ADDRESS = '0x6d07A415B32c73362DC44c205B47485cCCfFdE4e';
 
 // Aggregator addresses
 export const AGGREGATORS = {
@@ -54,6 +84,21 @@ export function getProvider() {
 export function getContract(provider) {
   return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 }
+
+export function getTargetBalanceContract(provider) {
+  return new ethers.Contract(TARGET_BALANCE_CONTRACT_ADDRESS, TARGET_BALANCE_CONTRACT_ABI, provider);
+}
+
+// ERC20 ABI for balanceOf
+export const ERC20_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
 
 // Format volume from wei to human-readable USDC
 export function formatVolume(volumeWei) {
