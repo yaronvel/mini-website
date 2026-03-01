@@ -15,11 +15,126 @@
 
 .app-header h1 {
   font-size: 2.5rem;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 1rem 0;
   background: linear-gradient(135deg, #646cff 0%, #535bf2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.wallet-value-card {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(100, 108, 255, 0.1) 0%, rgba(83, 91, 242, 0.1) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(100, 108, 255, 0.2);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .wallet-value-card {
+    background: linear-gradient(135deg, rgba(100, 108, 255, 0.05) 0%, rgba(83, 91, 242, 0.05) 100%);
+    border-color: rgba(100, 108, 255, 0.1);
+  }
+}
+
+.wallet-value-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.wallet-value-label {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+@media (prefers-color-scheme: light) {
+  .wallet-value-label {
+    color: rgba(0, 0, 0, 0.8);
+  }
+}
+
+.wallet-value-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #646cff;
+  text-shadow: 0 2px 4px rgba(100, 108, 255, 0.3);
+}
+
+.wallet-value-changes {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.wallet-change {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .wallet-change {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+.wallet-change.positive {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.wallet-change.negative {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.change-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+@media (prefers-color-scheme: light) {
+  .change-label {
+    color: rgba(0, 0, 0, 0.7);
+  }
+}
+
+.change-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.wallet-change.positive .change-value {
+  color: #22c55e;
+}
+
+.wallet-change.negative .change-value {
+  color: #ef4444;
+}
+
+.change-percent {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.wallet-change.positive .change-percent {
+  color: #22c55e;
+}
+
+.wallet-change.negative .change-percent {
+  color: #ef4444;
 }
 
 .block-info {

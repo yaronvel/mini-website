@@ -8,7 +8,7 @@ export const BASE_RPC_URL = import.meta.env.VITE_INFURA_URL || 'https://base-mai
 export const FIRST_BLOCK = 42784272;
 export const BLOCK_TIME_SECONDS = 2;
 
-// Contract ABI - only the volume function
+// Contract ABI - volume and getWalletValue functions
 export const CONTRACT_ABI = [
   {
     inputs: [
@@ -16,6 +16,13 @@ export const CONTRACT_ABI = [
       { internalType: 'address', name: 'token', type: 'address' }
     ],
     name: 'volume',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'getWalletValue',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function'

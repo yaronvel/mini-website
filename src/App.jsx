@@ -17,6 +17,7 @@ function App() {
   const [currentBlock, setCurrentBlock] = useState(null);
   const [currentTimestamp, setCurrentTimestamp] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [walletValue, setWalletValue] = useState(null);
 
   useEffect(() => {
     fetchVolumeData();
@@ -57,6 +58,45 @@ function App() {
 
       // Calculate block numbers
       const blocks = calculateBlockNumbers(blockInfo.blockNumber, blockInfo.timestamp);
+
+      // Fetch wallet value at different block heights
+      const readWalletValue = async (blockTag, retries = 3) => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+          try {
+            const result = await contract.getWalletValue({ blockTag });
+            return result;
+          } catch (error) {
+            if (attempt === retries) {
+              console.warn(`getWalletValue call reverted at block ${blockTag} after ${retries} attempts`);
+              return 0n;
+            }
+            await new Promise(resolve => setTimeout(resolve, attempt * 100));
+          }
+        }
+        return 0n;
+      };
+
+      const [walletValueCurrent, walletValue1h, walletValueFirst] = await Promise.all([
+        readWalletValue(blocks.current),
+        readWalletValue(blocks.oneHourAgo),
+        readWalletValue(blocks.first)
+      ]);
+
+      // Convert to numbers (already in USD, not wei)
+      const currentValue = Number(walletValueCurrent.toString());
+      const value1h = Number(walletValue1h.toString());
+      const valueFirst = Number(walletValueFirst.toString());
+
+      // Calculate changes
+      const change1h = blocks.hasFull1hData ? currentValue - value1h : null;
+      const change24h = currentValue - valueFirst;
+
+      setWalletValue({
+        current: currentValue,
+        change1h: change1h,
+        change24h: change24h,
+        timeSinceFirst: blocks.timeSinceFirst
+      });
 
       // Fetch volume data for all combinations
       const volumeData = {};
@@ -205,6 +245,46 @@ function App() {
             <p>Timestamp: Loading...</p>
           ) : null}
         </div>
+        
+        {/* Wallet Value Display */}
+        {walletValue && (
+          <div className="wallet-value-card">
+            <div className="wallet-value-main">
+              <span className="wallet-value-label">Wallet Value:</span>
+              <span className="wallet-value-amount">${walletValue.current.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="wallet-value-changes">
+              {walletValue.change1h !== null && walletValue.change1h !== undefined && (
+                <div className={`wallet-change ${walletValue.change1h >= 0 ? 'positive' : 'negative'}`}>
+                  <span className="change-label">1h:</span>
+                  <span className="change-value">
+                    {walletValue.change1h >= 0 ? '+' : ''}{walletValue.change1h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="change-percent">
+                    ({walletValue.change1h >= 0 ? '+' : ''}{((walletValue.change1h / walletValue.current) * 100).toFixed(2)}%)
+                  </span>
+                </div>
+              )}
+              {walletValue.change24h !== null && walletValue.change24h !== undefined && (
+                <div className={`wallet-change ${walletValue.change24h >= 0 ? 'positive' : 'negative'}`}>
+                  <span className="change-label">
+                    {walletValue.timeSinceFirst?.days >= 1 
+                      ? `${walletValue.timeSinceFirst.days.toFixed(1)}d`
+                      : walletValue.timeSinceFirst?.hours >= 1
+                      ? `${walletValue.timeSinceFirst.hours.toFixed(1)}h`
+                      : `${(walletValue.timeSinceFirst?.hours * 60).toFixed(0)}m`}:
+                  </span>
+                  <span className="change-value">
+                    {walletValue.change24h >= 0 ? '+' : ''}{walletValue.change24h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="change-percent">
+                    ({walletValue.change24h >= 0 ? '+' : ''}{((walletValue.change24h / walletValue.current) * 100).toFixed(2)}%)
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {error && (
