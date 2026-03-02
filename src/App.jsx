@@ -233,10 +233,30 @@ function App() {
             readVolume(blocks.twentyFourHoursAgo)
           ]);
 
+          // Debug: Print raw values from contract first
+          console.log(`[${tokenName}/${aggName}] Raw Volume Values from Contract:`);
+          console.log(`  volumeCurrent (raw):`, volumeCurrent, `type:`, typeof volumeCurrent);
+          console.log(`  volume1h (raw):`, volume1h, `type:`, typeof volume1h);
+          console.log(`  volume24h (raw):`, volume24h, `type:`, typeof volume24h);
+
           // Convert to BigInt for calculations
           const currentBigInt = typeof volumeCurrent === 'bigint' ? volumeCurrent : BigInt(volumeCurrent.toString());
           const oneHourBigInt = typeof volume1h === 'bigint' ? volume1h : BigInt(volume1h.toString());
           const twentyFourHoursBigInt = typeof volume24h === 'bigint' ? volume24h : BigInt(volume24h.toString());
+
+          // Debug: Print block numbers and volumes for all time periods
+          console.log(`[${tokenName}/${aggName}] Volume Stats Block Comparison:`);
+          console.log(`  Current block: ${blocks.current}`);
+          console.log(`  Volume at current block (${blocks.current}): ${currentBigInt.toString()}`);
+          console.log(`  1h ago block: ${blocks.oneHourAgo}`);
+          console.log(`  Volume at 1h ago block (${blocks.oneHourAgo}): ${oneHourBigInt.toString()}`);
+          console.log(`  24h ago block: ${blocks.twentyFourHoursAgo}`);
+          console.log(`  Volume at 24h ago block (${blocks.twentyFourHoursAgo}): ${twentyFourHoursBigInt.toString()}`);
+          console.log(`  First block: ${blocks.first}`);
+          console.log(`  Blocks difference (current - 24h ago): ${blocks.current - blocks.twentyFourHoursAgo}`);
+          console.log(`  Expected blocks in 24h: ${(3600 / 2) * 24} (43200)`);
+          console.log(`  Blocks difference (current - 1h ago): ${blocks.current - blocks.oneHourAgo}`);
+          console.log(`  Expected blocks in 1h: ${3600 / 2} (1800)`);
 
           // Calculate differences (volume in the time period)
           // For 1h: use 1h ago block if we have full 1h data, otherwise 0
@@ -249,17 +269,10 @@ function App() {
             oneHourVolume = 0n;
           }
 
-          // For 24h stats: use 24h ago block if we have full 24h data, otherwise use first block
-          let twentyFourHoursVolume;
-          if (blocks.hasFull24hData) {
-            // More than 24h has passed, calculate volume from 24h ago to now
-            twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
-          } else {
-            // Less than 24h has passed, use first block as baseline
-            const volumeFirst = await readVolume(blocks.first);
-            const firstBigInt = typeof volumeFirst === 'bigint' ? volumeFirst : BigInt(volumeFirst.toString());
-            twentyFourHoursVolume = currentBigInt - firstBigInt;
-          }
+          // For 24h stats: always calculate volume from 24h ago block to now
+          // The blocks.twentyFourHoursAgo is already calculated correctly (max of calculated 24h ago or first block)
+          let twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
+          console.log(`  Calculated 24h volume: ${twentyFourHoursVolume.toString()}`);
 
           volumeData[tokenName][aggName] = {
             oneHour: oneHourVolume.toString(),

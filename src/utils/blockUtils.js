@@ -22,9 +22,10 @@ export function calculateBlockNumbers(currentBlock, currentTimestamp) {
   const hasFull1hData = calculated1hAgo >= FIRST_BLOCK;
   
   // For 24h stats: calculate the block that's 24 hours ago
+  // Always use the actual calculated 24h ago block (even if before FIRST_BLOCK)
   const blocksIn24h = blocksPerHour * 24; // 43200 blocks in 24h
   const calculated24hAgo = currentBlock - blocksIn24h;
-  const block24hAgoActual = Math.max(FIRST_BLOCK, calculated24hAgo);
+  const block24hAgoActual = calculated24hAgo; // Use actual 24h ago, not clamped to FIRST_BLOCK
   const hasFull24hData = calculated24hAgo >= FIRST_BLOCK;
 
   return {

@@ -46,7 +46,8 @@ export function StatsTable({ stats, loading }) {
         {/* Per Token Stats - 1h */}
         <div className="stats-section">
           <h4>Per Token (1h)</h4>
-          <table className="stats-table">
+          <div className="stats-table-wrapper">
+            <table className="stats-table">
             <thead>
               <tr>
                 <th>Token</th>
@@ -74,12 +75,14 @@ export function StatsTable({ stats, loading }) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Per Aggregator Stats - 1h */}
         <div className="stats-section">
           <h4>Per Aggregator (1h)</h4>
-          <table className="stats-table">
+          <div className="stats-table-wrapper">
+            <table className="stats-table">
             <thead>
               <tr>
                 <th>Aggregator</th>
@@ -111,6 +114,7 @@ export function StatsTable({ stats, loading }) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Overall Total - 1h */}
@@ -131,7 +135,8 @@ export function StatsTable({ stats, loading }) {
         {/* Per Token Stats - 24h */}
         <div className="stats-section">
           <h4>Per Token (24h)</h4>
-          <table className="stats-table">
+          <div className="stats-table-wrapper">
+            <table className="stats-table">
             <thead>
               <tr>
                 <th>Token</th>
@@ -159,12 +164,14 @@ export function StatsTable({ stats, loading }) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Per Aggregator Stats - 24h */}
         <div className="stats-section">
           <h4>Per Aggregator (24h)</h4>
-          <table className="stats-table">
+          <div className="stats-table-wrapper">
+            <table className="stats-table">
             <thead>
               <tr>
                 <th>Aggregator</th>
@@ -196,6 +203,7 @@ export function StatsTable({ stats, loading }) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Overall Total - 24h */}
