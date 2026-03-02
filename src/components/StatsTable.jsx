@@ -18,7 +18,8 @@ function formatTimePeriod(timeSinceFirst) {
 }
 
 export function StatsTable({ stats, loading }) {
-  if (loading) {
+  // Only show loading on initial load when there's no data yet
+  if (loading && !stats) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
