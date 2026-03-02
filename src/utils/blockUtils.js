@@ -21,16 +21,19 @@ export function calculateBlockNumbers(currentBlock, currentTimestamp) {
   const block1hAgo = Math.max(FIRST_BLOCK, calculated1hAgo);
   const hasFull1hData = calculated1hAgo >= FIRST_BLOCK;
   
-  // For "24h" stats: always use first block as baseline (since contract doesn't exist longer)
-  // This will show volume since contract deployment
-  const block24hAgo = FIRST_BLOCK;
+  // For 24h stats: calculate the block that's 24 hours ago
+  const blocksIn24h = blocksPerHour * 24; // 43200 blocks in 24h
+  const calculated24hAgo = currentBlock - blocksIn24h;
+  const block24hAgoActual = Math.max(FIRST_BLOCK, calculated24hAgo);
+  const hasFull24hData = calculated24hAgo >= FIRST_BLOCK;
 
   return {
     current: currentBlock,
     oneHourAgo: block1hAgo,
-    twentyFourHoursAgo: block24hAgo, // Always first block
+    twentyFourHoursAgo: block24hAgoActual,
     first: FIRST_BLOCK,
     hasFull1hData: hasFull1hData,
+    hasFull24hData: hasFull24hData,
     timeSinceFirst: {
       seconds: secondsSinceFirst,
       hours: hoursSinceFirst,

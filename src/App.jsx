@@ -83,26 +83,34 @@ function App() {
         return 0n;
       };
 
-      const [walletValueCurrent, walletValue1h, walletValueFirst] = await Promise.all([
+      const [walletValueCurrent, walletValue1h, walletValue24h] = await Promise.all([
         readWalletValue(blocks.current),
         readWalletValue(blocks.oneHourAgo),
-        readWalletValue(blocks.first)
+        readWalletValue(blocks.twentyFourHoursAgo)
       ]);
 
       // Convert to numbers (already in USD, not wei)
       const currentValue = Number(walletValueCurrent.toString());
       const value1h = Number(walletValue1h.toString());
-      const valueFirst = Number(walletValueFirst.toString());
+      const value24h = Number(walletValue24h.toString());
 
       // Calculate changes
       const change1h = blocks.hasFull1hData ? currentValue - value1h : null;
-      const change24h = currentValue - valueFirst;
+      // For 24h: use 24h ago block if we have full 24h data, otherwise use first block
+      let change24h;
+      if (blocks.hasFull24hData) {
+        change24h = currentValue - value24h;
+      } else {
+        // Less than 24h has passed, use first block as baseline
+        const walletValueFirst = await readWalletValue(blocks.first);
+        const valueFirst = Number(walletValueFirst.toString());
+        change24h = currentValue - valueFirst;
+      }
 
       setWalletValue({
         current: currentValue,
         change1h: change1h,
-        change24h: change24h,
-        timeSinceFirst: blocks.timeSinceFirst
+        change24h: change24h
       });
 
       // Get wallet address
@@ -173,12 +181,20 @@ function App() {
       // Fetch PnL
       try {
         const pnlContract = getPnLContract(provider);
+        const pnlContractAddress = pnlContract.target;
+        console.log('PnL Contract Address:', pnlContractAddress);
+        
+        // Call pnl() function
         const pnlValue = await pnlContract.pnl();
+        console.log('PnL raw return value:', pnlValue);
+        console.log('PnL return value type:', typeof pnlValue);
+        console.log('PnL return value as string:', pnlValue.toString());
+        
         // Convert int256 to number and divide by 1e36
         const pnlBigInt = typeof pnlValue === 'bigint' ? pnlValue : BigInt(pnlValue.toString());
         const pnlNumber = Number(pnlBigInt) / 1e36;
+        console.log('PnL value after conversion:', pnlNumber);
         setPnl(pnlNumber);
-        console.log('PnL value:', pnlNumber);
       } catch (error) {
         console.error('Error fetching PnL:', error);
         setPnl(null);
@@ -211,16 +227,16 @@ function App() {
           };
 
           // Read volumes at all block heights
-          const [volumeCurrent, volume1h, volumeFirst] = await Promise.all([
+          const [volumeCurrent, volume1h, volume24h] = await Promise.all([
             readVolume(blocks.current),
             readVolume(blocks.oneHourAgo),
-            readVolume(blocks.first)
+            readVolume(blocks.twentyFourHoursAgo)
           ]);
 
           // Convert to BigInt for calculations
           const currentBigInt = typeof volumeCurrent === 'bigint' ? volumeCurrent : BigInt(volumeCurrent.toString());
           const oneHourBigInt = typeof volume1h === 'bigint' ? volume1h : BigInt(volume1h.toString());
-          const firstBigInt = typeof volumeFirst === 'bigint' ? volumeFirst : BigInt(volumeFirst.toString());
+          const twentyFourHoursBigInt = typeof volume24h === 'bigint' ? volume24h : BigInt(volume24h.toString());
 
           // Calculate differences (volume in the time period)
           // For 1h: use 1h ago block if we have full 1h data, otherwise 0
@@ -232,9 +248,18 @@ function App() {
             // Less than 1h has passed since first block, can't calculate 1h stats
             oneHourVolume = 0n;
           }
-          
-          // For "all time" stats: always use first block as baseline (shows volume since contract deployment)
-          const twentyFourHoursVolume = currentBigInt - firstBigInt;
+
+          // For 24h stats: use 24h ago block if we have full 24h data, otherwise use first block
+          let twentyFourHoursVolume;
+          if (blocks.hasFull24hData) {
+            // More than 24h has passed, calculate volume from 24h ago to now
+            twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
+          } else {
+            // Less than 24h has passed, use first block as baseline
+            const volumeFirst = await readVolume(blocks.first);
+            const firstBigInt = typeof volumeFirst === 'bigint' ? volumeFirst : BigInt(volumeFirst.toString());
+            twentyFourHoursVolume = currentBigInt - firstBigInt;
+          }
 
           volumeData[tokenName][aggName] = {
             oneHour: oneHourVolume.toString(),
@@ -353,13 +378,7 @@ function App() {
               )}
               {walletValue.change24h !== null && walletValue.change24h !== undefined && (
                 <div className={`wallet-change ${walletValue.change24h >= 0 ? 'positive' : 'negative'}`}>
-                  <span className="change-label">
-                    {walletValue.timeSinceFirst?.days >= 1 
-                      ? `${walletValue.timeSinceFirst.days.toFixed(1)}d`
-                      : walletValue.timeSinceFirst?.hours >= 1
-                      ? `${walletValue.timeSinceFirst.hours.toFixed(1)}h`
-                      : `${(walletValue.timeSinceFirst?.hours * 60).toFixed(0)}m`}:
-                  </span>
+                  <span className="change-label">24h:</span>
                   <span className="change-value">
                     {walletValue.change24h >= 0 ? '+' : ''}{walletValue.change24h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
@@ -378,7 +397,7 @@ function App() {
             <h3 className="token-balances-title">Token Balances</h3>
             <div className="token-balances-grid">
               {Object.entries(tokenBalances).map(([tokenName, data]) => {
-                const tokenDisplayName = tokenName === 'sol' ? 'SOL' : tokenName.toUpperCase();
+                const tokenDisplayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
                 return (
                   <div key={tokenName} className="token-balance-item">
                     <div className="token-balance-header">

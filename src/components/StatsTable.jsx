@@ -61,7 +61,7 @@ export function StatsTable({ stats, loading }) {
                 const kyber1h = tokenStats.kyberSwap?.oneHour || '0';
                 const zeroX1h = tokenStats.zeroX?.oneHour || '0';
                 const total1h = (BigInt(kyber1h) + BigInt(zeroX1h)).toString();
-                const displayName = tokenName === 'sol' ? 'SOL' : tokenName.toUpperCase();
+                const displayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
 
                 return (
                   <tr key={tokenName}>
@@ -85,7 +85,7 @@ export function StatsTable({ stats, loading }) {
                 <th>Aggregator</th>
                 <th>WETH</th>
                 <th>CBBTC</th>
-                <th>SOL</th>
+                <th>Virtual</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -94,8 +94,8 @@ export function StatsTable({ stats, loading }) {
                 const aggStats = stats.perAggregator[aggName] || {};
                 const weth1h = aggStats.weth?.oneHour || '0';
                 const cbbtc1h = aggStats.cbbtc?.oneHour || '0';
-                const sol1h = aggStats.sol?.oneHour || '0';
-                const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(sol1h)).toString();
+                const virtual1h = aggStats.virtual?.oneHour || '0';
+                const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(virtual1h)).toString();
 
                 return (
                   <tr key={aggName}>
@@ -104,7 +104,7 @@ export function StatsTable({ stats, loading }) {
                     </td>
                     <td>${formatVolume(weth1h)}</td>
                     <td>${formatVolume(cbbtc1h)}</td>
-                    <td>${formatVolume(sol1h)}</td>
+                    <td>${formatVolume(virtual1h)}</td>
                     <td className="total-cell">${formatVolume(total1h)}</td>
                   </tr>
                 );
@@ -124,13 +124,13 @@ export function StatsTable({ stats, loading }) {
         </div>
       </div>
 
-      {/* All Time Stats Section */}
+      {/* 24h Stats Section */}
       <div className="time-period-section">
-        <h3 className="time-period-header">All Time Statistics ({timePeriodLabel})</h3>
+        <h3 className="time-period-header">24h Statistics</h3>
         
-        {/* Per Token Stats - All Time */}
+        {/* Per Token Stats - 24h */}
         <div className="stats-section">
-          <h4>Per Token ({timePeriodLabel})</h4>
+          <h4>Per Token (24h)</h4>
           <table className="stats-table">
             <thead>
               <tr>
@@ -146,7 +146,7 @@ export function StatsTable({ stats, loading }) {
                 const kyber24h = tokenStats.kyberSwap?.twentyFourHours || '0';
                 const zeroX24h = tokenStats.zeroX?.twentyFourHours || '0';
                 const total24h = (BigInt(kyber24h) + BigInt(zeroX24h)).toString();
-                const displayName = tokenName === 'sol' ? 'SOL' : tokenName.toUpperCase();
+                const displayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
 
                 return (
                   <tr key={tokenName}>
@@ -161,16 +161,16 @@ export function StatsTable({ stats, loading }) {
           </table>
         </div>
 
-        {/* Per Aggregator Stats - All Time */}
+        {/* Per Aggregator Stats - 24h */}
         <div className="stats-section">
-          <h4>Per Aggregator ({timePeriodLabel})</h4>
+          <h4>Per Aggregator (24h)</h4>
           <table className="stats-table">
             <thead>
               <tr>
                 <th>Aggregator</th>
                 <th>WETH</th>
                 <th>CBBTC</th>
-                <th>SOL</th>
+                <th>Virtual</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -179,8 +179,8 @@ export function StatsTable({ stats, loading }) {
                 const aggStats = stats.perAggregator[aggName] || {};
                 const weth24h = aggStats.weth?.twentyFourHours || '0';
                 const cbbtc24h = aggStats.cbbtc?.twentyFourHours || '0';
-                const sol24h = aggStats.sol?.twentyFourHours || '0';
-                const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(sol24h)).toString();
+                const virtual24h = aggStats.virtual?.twentyFourHours || '0';
+                const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(virtual24h)).toString();
 
                 return (
                   <tr key={aggName}>
@@ -189,7 +189,7 @@ export function StatsTable({ stats, loading }) {
                     </td>
                     <td>${formatVolume(weth24h)}</td>
                     <td>${formatVolume(cbbtc24h)}</td>
-                    <td>${formatVolume(sol24h)}</td>
+                    <td>${formatVolume(virtual24h)}</td>
                     <td className="total-cell">${formatVolume(total24h)}</td>
                   </tr>
                 );
@@ -198,11 +198,11 @@ export function StatsTable({ stats, loading }) {
           </table>
         </div>
 
-        {/* Overall Total - All Time */}
+        {/* Overall Total - 24h */}
         <div className="stats-section">
           <div className="totals-card">
             <div className="total-item">
-              <span className="total-label">Total Volume ({timePeriodLabel}):</span>
+              <span className="total-label">Total Volume (24h):</span>
               <span className="total-value">${formatVolume(stats.overall?.twentyFourHours || '0')}</span>
             </div>
           </div>

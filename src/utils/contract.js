@@ -51,7 +51,7 @@ export const TARGET_BALANCE_CONTRACT_ABI = [
 export const TOKENS = {
   weth: '0x4200000000000000000000000000000000000006',
   cbbtc: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
-  sol: '0x311935Cd80B76769bF2ecC9D8Ab7635b2139cf82',
+  virtual: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b',
   usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' // Base USDC
 };
 
@@ -59,7 +59,7 @@ export const TOKENS = {
 export const TOKEN_DECIMALS = {
   weth: 18,
   cbbtc: 8,
-  sol: 9,
+  virtual: 18,
   usdc: 6
 };
 
@@ -67,7 +67,7 @@ export const TOKEN_DECIMALS = {
 export const TARGET_BALANCE_CONTRACT_ADDRESS = '0x6d07A415B32c73362DC44c205B47485cCCfFdE4e';
 
 // PnL contract address
-export const PNL_CONTRACT_ADDRESS = '0x22c23082914f60E4BAd2D6d0431f387Aa4Be7B6d';
+export const PNL_CONTRACT_ADDRESS = '0xf4Eafd0f4210C173AbFdD291A8292E7079BeCd9F';
 
 // PnL contract ABI
 export const PNL_CONTRACT_ABI = [
