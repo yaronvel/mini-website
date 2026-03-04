@@ -10,7 +10,8 @@ import {
   TOKEN_DECIMALS,
   AGGREGATORS,
   USDC_DIVISOR,
-  ERC20_ABI
+  ERC20_ABI,
+  FIRST_BLOCK
 } from './utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from './utils/blockUtils';
 import './App.css';
@@ -25,6 +26,7 @@ function App() {
   const [walletValue, setWalletValue] = useState(null);
   const [tokenBalances, setTokenBalances] = useState(null);
   const [pnl, setPnl] = useState(null);
+  const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
 
   useEffect(() => {
     fetchVolumeData();
@@ -178,23 +180,75 @@ function App() {
       
       setTokenBalances(balanceData);
 
-      // Fetch PnL
+      // Get first block timestamp if not already set
+      if (!firstBlockTimestamp) {
+        try {
+          const firstBlock = await provider.getBlock(FIRST_BLOCK);
+          if (firstBlock && firstBlock.timestamp) {
+            setFirstBlockTimestamp(Number(firstBlock.timestamp));
+          }
+        } catch (error) {
+          console.warn('Error fetching first block timestamp:', error);
+        }
+      }
+
+      // Fetch PnL at different block heights
       try {
         const pnlContract = getPnLContract(provider);
         const pnlContractAddress = pnlContract.target;
         console.log('PnL Contract Address:', pnlContractAddress);
         
-        // Call pnl() function
-        const pnlValue = await pnlContract.pnl();
-        console.log('PnL raw return value:', pnlValue);
-        console.log('PnL return value type:', typeof pnlValue);
-        console.log('PnL return value as string:', pnlValue.toString());
-        
-        // Convert int256 to number and divide by 1e36
-        const pnlBigInt = typeof pnlValue === 'bigint' ? pnlValue : BigInt(pnlValue.toString());
-        const pnlNumber = Number(pnlBigInt) / 1e36;
-        console.log('PnL value after conversion:', pnlNumber);
-        setPnl(pnlNumber);
+        // Read PnL at current, 1h ago, and 24h ago blocks
+        const readPnL = async (blockTag, retries = 3) => {
+          for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+              const result = await pnlContract.pnl({ blockTag });
+              return result;
+            } catch (error) {
+              if (attempt === retries) {
+                console.warn(`PnL call reverted at block ${blockTag} after ${retries} attempts`);
+                return 0n;
+              }
+              await new Promise(resolve => setTimeout(resolve, attempt * 100));
+            }
+          }
+          return 0n;
+        };
+
+        const [pnlCurrent, pnl1h, pnl24h] = await Promise.all([
+          readPnL(blocks.current),
+          readPnL(blocks.oneHourAgo),
+          readPnL(blocks.twentyFourHoursAgo)
+        ]);
+
+        // Convert to numbers and divide by 1e36
+        const pnlCurrentBigInt = typeof pnlCurrent === 'bigint' ? pnlCurrent : BigInt(pnlCurrent.toString());
+        const pnl1hBigInt = typeof pnl1h === 'bigint' ? pnl1h : BigInt(pnl1h.toString());
+        const pnl24hBigInt = typeof pnl24h === 'bigint' ? pnl24h : BigInt(pnl24h.toString());
+
+        const pnlCurrentNumber = Number(pnlCurrentBigInt) / 1e36;
+        const pnl1hNumber = Number(pnl1hBigInt) / 1e36;
+        const pnl24hNumber = Number(pnl24hBigInt) / 1e36;
+
+        // Calculate differences
+        const pnlSinceFirst = pnlCurrentNumber; // PnL since first block (absolute value)
+        const pnl1hChange = blocks.hasFull1hData ? pnlCurrentNumber - pnl1hNumber : null;
+        const pnl24hChange = blocks.hasFull24hData ? pnlCurrentNumber - pnl24hNumber : null;
+
+        console.log('PnL values:', {
+          current: pnlCurrentNumber,
+          '1h ago': pnl1hNumber,
+          '24h ago': pnl24hNumber,
+          'since first': pnlSinceFirst,
+          '1h change': pnl1hChange,
+          '24h change': pnl24hChange
+        });
+
+        setPnl({
+          sinceFirst: pnlSinceFirst,
+          oneHour: pnl1hChange,
+          twentyFourHours: pnl24hChange
+        });
       } catch (error) {
         console.error('Error fetching PnL:', error);
         setPnl(null);
@@ -458,23 +512,41 @@ function App() {
         {/* PnL Display */}
         {pnl !== null && (
           <div className="pnl-card">
-            <div className="pnl-content">
-              <span className="pnl-label">PnL since block 42784272:</span>
-              <span className={`pnl-value ${pnl >= 0 ? 'positive' : 'negative'}`}>
-                {pnl >= 0 ? '+' : ''}{pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-        )}
-        
-        {/* PnL Display */}
-        {pnl !== null && (
-          <div className="pnl-card">
-            <div className="pnl-content">
-              <span className="pnl-label">PnL since block 42784272:</span>
-              <span className={`pnl-value ${pnl >= 0 ? 'positive' : 'negative'}`}>
-                {pnl >= 0 ? '+' : ''}{pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
+            <h3 className="pnl-title">PnL Statistics</h3>
+            <div className="pnl-items">
+              {/* PnL since first block */}
+              {pnl.sinceFirst !== null && pnl.sinceFirst !== undefined && (
+                <div className="pnl-item">
+                  <span className="pnl-label">
+                    {firstBlockTimestamp 
+                      ? `Since ${new Date(firstBlockTimestamp * 1000).toLocaleString()}:`
+                      : `Since block ${FIRST_BLOCK}:`}
+                  </span>
+                  <span className={`pnl-value ${pnl.sinceFirst >= 0 ? 'positive' : 'negative'}`}>
+                    {pnl.sinceFirst >= 0 ? '+' : ''}{pnl.sinceFirst.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+              
+              {/* PnL in last 1h */}
+              {pnl.oneHour !== null && pnl.oneHour !== undefined && (
+                <div className="pnl-item">
+                  <span className="pnl-label">Last 1h:</span>
+                  <span className={`pnl-value ${pnl.oneHour >= 0 ? 'positive' : 'negative'}`}>
+                    {pnl.oneHour >= 0 ? '+' : ''}{pnl.oneHour.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+              
+              {/* PnL in last 24h */}
+              {pnl.twentyFourHours !== null && pnl.twentyFourHours !== undefined && (
+                <div className="pnl-item">
+                  <span className="pnl-label">Last 24h:</span>
+                  <span className={`pnl-value ${pnl.twentyFourHours >= 0 ? 'positive' : 'negative'}`}>
+                    {pnl.twentyFourHours >= 0 ? '+' : ''}{pnl.twentyFourHours.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
