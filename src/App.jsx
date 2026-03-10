@@ -339,13 +339,15 @@ function App() {
       const perToken = {};
       const perAggregator = {
         kyberSwap: {},
-        zeroX: {}
+        zeroX: {},
+        spyros: {}
       };
 
       // Per token aggregation
       for (const tokenName of Object.keys(TOKENS)) {
         const kyber = volumeData[tokenName].kyberSwap || { oneHour: '0', twentyFourHours: '0' };
         const zeroX = volumeData[tokenName].zeroX || { oneHour: '0', twentyFourHours: '0' };
+        const spyros = volumeData[tokenName].spyros || { oneHour: '0', twentyFourHours: '0' };
 
         perToken[tokenName] = {
           kyberSwap: {
@@ -355,6 +357,10 @@ function App() {
           zeroX: {
             oneHour: zeroX.oneHour,
             twentyFourHours: zeroX.twentyFourHours
+          },
+          spyros: {
+            oneHour: spyros.oneHour,
+            twentyFourHours: spyros.twentyFourHours
           }
         };
       }
