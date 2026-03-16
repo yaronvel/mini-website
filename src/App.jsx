@@ -27,6 +27,7 @@ function App() {
   const [tokenBalances, setTokenBalances] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
+  const [minUSDValue, setMinUSDValue] = useState(null);
 
   useEffect(() => {
     fetchVolumeData();
@@ -85,16 +86,22 @@ function App() {
         return 0n;
       };
 
-      const [walletValueCurrent, walletValue1h, walletValue24h] = await Promise.all([
+      const [walletValueCurrent, walletValue1h, walletValue24h, minUSDValueRaw] = await Promise.all([
         readWalletValue(blocks.current),
         readWalletValue(blocks.oneHourAgo),
-        readWalletValue(blocks.twentyFourHoursAgo)
+        readWalletValue(blocks.twentyFourHoursAgo),
+        // minUSDValue is a simple view function, no blockTag needed
+        contract.minUSDValue().catch((error) => {
+          console.warn('Error fetching minUSDValue:', error);
+          return 0n;
+        })
       ]);
 
-      // Convert to numbers (already in USD, not wei)
+      // Convert to numbers (already in USD, not wei) - minUSDValue also has no decimals
       const currentValue = Number(walletValueCurrent.toString());
       const value1h = Number(walletValue1h.toString());
       const value24h = Number(walletValue24h.toString());
+      const minUSDValueNumber = Number(minUSDValueRaw.toString());
 
       // Calculate changes
       const change1h = blocks.hasFull1hData ? currentValue - value1h : null;
@@ -114,6 +121,8 @@ function App() {
         change1h: change1h,
         change24h: change24h
       });
+
+      setMinUSDValue(minUSDValueNumber);
 
       // Get wallet address
       let walletAddress;
@@ -436,9 +445,33 @@ function App() {
         {walletValue && (
           <div className="wallet-value-card">
             <div className="wallet-value-main">
-              <span className="wallet-value-label">Wallet Value:</span>
-              <span className="wallet-value-amount">${walletValue.current.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <div className="wallet-value-main-left">
+                <span className="wallet-value-label">Wallet Value</span>
+                <span className="wallet-value-amount">
+                  ${walletValue.current.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
+            {minUSDValue !== null && minUSDValue !== undefined && (
+              <div className="wallet-value-minusd-block">
+                <div className="wallet-value-minusd-text">
+                  <span className="wallet-value-minusd-label">Circuit Breaker Min USD Value</span>
+                  <span className="wallet-value-minusd-amount">
+                    ${minUSDValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+                {walletValue.current > 0 && (
+                  <div className="wallet-value-minusd-bar">
+                    <div
+                      className="wallet-value-minusd-bar-fill"
+                      style={{
+                        width: `${Math.min((minUSDValue / walletValue.current) * 100, 100)}%`
+                      }}
+                    ></div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="wallet-value-changes">
               {walletValue.change1h !== null && walletValue.change1h !== undefined && (
                 <div className={`wallet-change ${walletValue.change1h >= 0 ? 'positive' : 'negative'}`}>
