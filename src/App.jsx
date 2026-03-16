@@ -194,12 +194,14 @@ function App() {
 
       // Fetch PnL at different block heights
       try {
-        const pnlContract = getPnLContract(provider);
-        const pnlContractAddress = pnlContract.target;
-        console.log('PnL Contract Address:', pnlContractAddress);
-        
         // Read PnL at current, 1h ago, and 24h ago blocks
+        // Use appropriate contract address based on block number
         const readPnL = async (blockTag, retries = 3) => {
+          // Get the appropriate contract for this block number
+          const pnlContract = getPnLContract(provider, blockTag);
+          const pnlContractAddress = pnlContract.target;
+          console.log(`PnL Contract Address for block ${blockTag}:`, pnlContractAddress);
+          
           for (let attempt = 1; attempt <= retries; attempt++) {
             try {
               const result = await pnlContract.pnl({ blockTag });

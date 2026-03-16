@@ -66,8 +66,10 @@ export const TOKEN_DECIMALS = {
 // Target balance contract address
 export const TARGET_BALANCE_CONTRACT_ADDRESS = '0xe00B0150bA21625353b69d82b3ec28a9A744B0C7';
 
-// PnL contract address
-export const PNL_CONTRACT_ADDRESS = '0xf4Eafd0f4210C173AbFdD291A8292E7079BeCd9F';
+// PnL contract addresses
+export const PNL_CONTRACT_ADDRESS_OLD = '0xf4Eafd0f4210C173AbFdD291A8292E7079BeCd9F';
+export const PNL_CONTRACT_ADDRESS_NEW = '0x1b2Bfed2092532701e5C5DA69a0796989c094290';
+export const PNL_CONTRACT_BLOCK_THRESHOLD = 43441250;
 
 // PnL contract ABI
 export const PNL_CONTRACT_ABI = [
@@ -104,8 +106,12 @@ export function getTargetBalanceContract(provider) {
   return new ethers.Contract(TARGET_BALANCE_CONTRACT_ADDRESS, TARGET_BALANCE_CONTRACT_ABI, provider);
 }
 
-export function getPnLContract(provider) {
-  return new ethers.Contract(PNL_CONTRACT_ADDRESS, PNL_CONTRACT_ABI, provider);
+export function getPnLContract(provider, blockNumber = null) {
+  // If blockNumber is provided and >= threshold, use new contract, otherwise use old contract
+  const contractAddress = (blockNumber !== null && blockNumber >= PNL_CONTRACT_BLOCK_THRESHOLD) 
+    ? PNL_CONTRACT_ADDRESS_NEW 
+    : PNL_CONTRACT_ADDRESS_OLD;
+  return new ethers.Contract(contractAddress, PNL_CONTRACT_ABI, provider);
 }
 
 // ERC20 ABI for balanceOf
