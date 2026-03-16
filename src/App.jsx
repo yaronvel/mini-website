@@ -506,7 +506,25 @@ function App() {
                         className="token-balance-progress-fill"
                         style={{ 
                           width: `${Math.min(data.percentage, 100)}%`,
-                          backgroundColor: data.percentage >= 100 ? '#22c55e' : data.percentage >= 50 ? '#f59e0b' : '#ef4444'
+                          // Color logic:
+                          // - < 50%: red
+                          // - 50–100%: yellow
+                          // - 100–200%: green that gets darker as percentage increases
+                          // - >= 200%: very dark green
+                          backgroundColor: (() => {
+                            const p = data.percentage;
+                            if (p < 50) return '#ef4444'; // red
+                            if (p < 100) return '#f59e0b'; // yellow
+                            if (p >= 200) return '#064e3b'; // very dark green
+                            // Between 100% and 200%: interpolate light -> dark green
+                            const t = (p - 100) / 100; // 0 to 1
+                            const start = { r: 34, g: 197, b: 94 };  // #22c55e
+                            const end   = { r: 6,  g: 78,  b: 59 };  // #064e3b
+                            const r = Math.round(start.r + (end.r - start.r) * t);
+                            const g = Math.round(start.g + (end.g - start.g) * t);
+                            const b = Math.round(start.b + (end.b - start.b) * t);
+                            return `rgb(${r}, ${g}, ${b})`;
+                          })()
                         }}
                       ></div>
                     </div>
