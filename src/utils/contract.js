@@ -7,6 +7,9 @@ export const CONTRACT_ADDRESS = '0xA05dE8fedaF5d47a6A8726811cC5f387BEf1F816';
 export const BASE_RPC_URL = import.meta.env.VITE_INFURA_URL || 'https://base-mainnet.infura.io/v3/0ec938da607340d3bf91f8b60306f147';
 export const FIRST_BLOCK = 42784272;
 export const BLOCK_TIME_SECONDS = 2;
+/** FIRST_BLOCK + 31 days, assuming exactly 2 seconds per block */
+export const PNL_ANCHOR_BLOCK =
+  FIRST_BLOCK + (31 * 24 * 3600) / BLOCK_TIME_SECONDS;
 
 // Contract ABI - volume, getWalletValue, wallet, and minUSDValue functions
 export const CONTRACT_ABI = [

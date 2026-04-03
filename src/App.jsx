@@ -11,7 +11,8 @@ import {
   AGGREGATORS,
   USDC_DIVISOR,
   ERC20_ABI,
-  FIRST_BLOCK
+  FIRST_BLOCK,
+  PNL_ANCHOR_BLOCK
 } from './utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from './utils/blockUtils';
 import './App.css';
@@ -189,12 +190,14 @@ function App() {
       
       setTokenBalances(balanceData);
 
-      // Get first block timestamp if not already set
-      if (!firstBlockTimestamp) {
+      // First block timestamp (local so PnL labels can use it in the same fetch)
+      let firstBlockTsResolved = firstBlockTimestamp;
+      if (firstBlockTsResolved == null) {
         try {
           const firstBlock = await provider.getBlock(FIRST_BLOCK);
           if (firstBlock && firstBlock.timestamp) {
-            setFirstBlockTimestamp(Number(firstBlock.timestamp));
+            firstBlockTsResolved = Number(firstBlock.timestamp);
+            setFirstBlockTimestamp(firstBlockTsResolved);
           }
         } catch (error) {
           console.warn('Error fetching first block timestamp:', error);
@@ -226,37 +229,71 @@ function App() {
           return 0n;
         };
 
-        const [pnlCurrent, pnl1h, pnl24h] = await Promise.all([
+        const hasFullAnchor31dData = blocks.current >= PNL_ANCHOR_BLOCK;
+        const [pnlCurrent, pnl1h, pnl24h, pnlAtFirstBlock, pnlAtAnchor31d] = await Promise.all([
           readPnL(blocks.current),
           readPnL(blocks.oneHourAgo),
-          readPnL(blocks.twentyFourHoursAgo)
+          readPnL(blocks.twentyFourHoursAgo),
+          hasFullAnchor31dData ? readPnL(FIRST_BLOCK) : Promise.resolve(0n),
+          hasFullAnchor31dData ? readPnL(PNL_ANCHOR_BLOCK) : Promise.resolve(0n)
         ]);
+
+        let anchor31dTimestamp = null;
+        if (hasFullAnchor31dData) {
+          try {
+            const anchorBlock = await provider.getBlock(PNL_ANCHOR_BLOCK);
+            if (anchorBlock && anchorBlock.timestamp != null) {
+              anchor31dTimestamp = Number(anchorBlock.timestamp);
+            }
+          } catch (e) {
+            console.warn('Failed to fetch PnL anchor block timestamp:', e);
+          }
+        }
 
         // Convert to numbers and divide by 1e36
         const pnlCurrentBigInt = typeof pnlCurrent === 'bigint' ? pnlCurrent : BigInt(pnlCurrent.toString());
         const pnl1hBigInt = typeof pnl1h === 'bigint' ? pnl1h : BigInt(pnl1h.toString());
         const pnl24hBigInt = typeof pnl24h === 'bigint' ? pnl24h : BigInt(pnl24h.toString());
+        const pnlAtFirstBigInt = typeof pnlAtFirstBlock === 'bigint' ? pnlAtFirstBlock : BigInt(pnlAtFirstBlock.toString());
+        const pnlAtAnchorBigInt = typeof pnlAtAnchor31d === 'bigint' ? pnlAtAnchor31d : BigInt(pnlAtAnchor31d.toString());
 
         const pnlCurrentNumber = Number(pnlCurrentBigInt) / 1e36;
         const pnl1hNumber = Number(pnl1hBigInt) / 1e36;
         const pnl24hNumber = Number(pnl24hBigInt) / 1e36;
+        const pnlAtFirstNumber = Number(pnlAtFirstBigInt) / 1e36;
+        const pnlAtAnchorNumber = Number(pnlAtAnchorBigInt) / 1e36;
 
         // Calculate differences
-        const pnlSinceFirst = pnlCurrentNumber; // PnL since first block (absolute value)
+        const totalSinceFirst = pnlCurrentNumber; // cumulative PnL at head (contract view)
         const pnl1hChange = blocks.hasFull1hData ? pnlCurrentNumber - pnl1hNumber : null;
         const pnl24hChange = blocks.hasFull24hData ? pnlCurrentNumber - pnl24hNumber : null;
+        const pnlSinceAnchor31d = hasFullAnchor31dData
+          ? pnlCurrentNumber - pnlAtAnchorNumber
+          : null;
+        const pnlFirstBlockUntilAnchor31d =
+          hasFullAnchor31dData &&
+          firstBlockTsResolved != null &&
+          anchor31dTimestamp != null
+            ? pnlAtAnchorNumber - pnlAtFirstNumber
+            : null;
 
         console.log('PnL values:', {
           current: pnlCurrentNumber,
           '1h ago': pnl1hNumber,
           '24h ago': pnl24hNumber,
-          'since first': pnlSinceFirst,
+          totalSinceFirst,
           '1h change': pnl1hChange,
-          '24h change': pnl24hChange
+          '24h change': pnl24hChange,
+          'since anchor+31d': pnlSinceAnchor31d,
+          'first until anchor+31d': pnlFirstBlockUntilAnchor31d
         });
 
         setPnl({
-          sinceFirst: pnlSinceFirst,
+          totalSinceFirst,
+          firstBlockLabelTs: firstBlockTsResolved,
+          sinceAnchor31d: pnlSinceAnchor31d,
+          sinceAnchor31dTimestamp: anchor31dTimestamp,
+          firstUntilAnchor31d: pnlFirstBlockUntilAnchor31d,
           oneHour: pnl1hChange,
           twentyFourHours: pnl24hChange
         });
@@ -573,19 +610,65 @@ function App() {
           <div className="pnl-card">
             <h3 className="pnl-title">PnL Statistics</h3>
             <div className="pnl-items">
-              {/* PnL since first block */}
-              {pnl.sinceFirst !== null && pnl.sinceFirst !== undefined && (
+              {pnl.totalSinceFirst !== null && pnl.totalSinceFirst !== undefined && (
                 <div className="pnl-item">
                   <span className="pnl-label">
-                    {firstBlockTimestamp 
-                      ? `Since ${new Date(firstBlockTimestamp * 1000).toLocaleString()}:`
-                      : `Since block ${FIRST_BLOCK}:`}
+                    {(pnl.firstBlockLabelTs ?? firstBlockTimestamp) != null
+                      ? `Total since ${new Date((pnl.firstBlockLabelTs ?? firstBlockTimestamp) * 1000).toLocaleString()}:`
+                      : `Total since block ${FIRST_BLOCK}:`}
                   </span>
-                  <span className={`pnl-value ${pnl.sinceFirst >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl.sinceFirst >= 0 ? '+' : ''}{pnl.sinceFirst.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className={`pnl-value ${pnl.totalSinceFirst >= 0 ? 'positive' : 'negative'}`}>
+                    {pnl.totalSinceFirst >= 0 ? '+' : ''}
+                    {pnl.totalSinceFirst.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
                   </span>
                 </div>
               )}
+
+              {pnl.sinceAnchor31d !== null &&
+                pnl.sinceAnchor31d !== undefined &&
+                pnl.sinceAnchor31dTimestamp != null && (
+                  <div className="pnl-item">
+                    <span className="pnl-label">
+                      Since{' '}
+                      {new Date(pnl.sinceAnchor31dTimestamp * 1000).toLocaleString()}:
+                    </span>
+                    <span
+                      className={`pnl-value ${pnl.sinceAnchor31d >= 0 ? 'positive' : 'negative'}`}
+                    >
+                      {pnl.sinceAnchor31d >= 0 ? '+' : ''}
+                      {pnl.sinceAnchor31d.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </span>
+                  </div>
+                )}
+
+              {pnl.firstUntilAnchor31d !== null &&
+                pnl.firstUntilAnchor31d !== undefined &&
+                (pnl.firstBlockLabelTs ?? firstBlockTimestamp) != null &&
+                pnl.sinceAnchor31dTimestamp != null && (
+                  <div className="pnl-item">
+                    <span className="pnl-label">
+                      Since{' '}
+                      {new Date((pnl.firstBlockLabelTs ?? firstBlockTimestamp) * 1000).toLocaleString()}{' '}
+                      until{' '}
+                      {new Date(pnl.sinceAnchor31dTimestamp * 1000).toLocaleString()}:
+                    </span>
+                    <span
+                      className={`pnl-value ${pnl.firstUntilAnchor31d >= 0 ? 'positive' : 'negative'}`}
+                    >
+                      {pnl.firstUntilAnchor31d >= 0 ? '+' : ''}
+                      {pnl.firstUntilAnchor31d.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </span>
+                  </div>
+                )}
               
               {/* PnL in last 1h */}
               {pnl.oneHour !== null && pnl.oneHour !== undefined && (
