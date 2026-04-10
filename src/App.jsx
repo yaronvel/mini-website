@@ -385,32 +385,20 @@ function App() {
 
       // Calculate aggregated statistics
       const perToken = {};
-      const perAggregator = {
-        kyberSwap: {},
-        zeroX: {},
-        spyros: {}
-      };
+      const perAggregator = Object.fromEntries(
+        Object.keys(AGGREGATORS).map((k) => [k, {}])
+      );
 
       // Per token aggregation
       for (const tokenName of Object.keys(TOKENS)) {
-        const kyber = volumeData[tokenName].kyberSwap || { oneHour: '0', twentyFourHours: '0' };
-        const zeroX = volumeData[tokenName].zeroX || { oneHour: '0', twentyFourHours: '0' };
-        const spyros = volumeData[tokenName].spyros || { oneHour: '0', twentyFourHours: '0' };
-
-        perToken[tokenName] = {
-          kyberSwap: {
-            oneHour: kyber.oneHour,
-            twentyFourHours: kyber.twentyFourHours
-          },
-          zeroX: {
-            oneHour: zeroX.oneHour,
-            twentyFourHours: zeroX.twentyFourHours
-          },
-          spyros: {
-            oneHour: spyros.oneHour,
-            twentyFourHours: spyros.twentyFourHours
-          }
-        };
+        perToken[tokenName] = {};
+        for (const aggName of Object.keys(AGGREGATORS)) {
+          const vol = volumeData[tokenName][aggName] || { oneHour: '0', twentyFourHours: '0' };
+          perToken[tokenName][aggName] = {
+            oneHour: vol.oneHour,
+            twentyFourHours: vol.twentyFourHours
+          };
+        }
       }
 
       // Per aggregator aggregation

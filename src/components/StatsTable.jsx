@@ -1,5 +1,9 @@
-import { formatVolume } from '../utils/contract.js';
-import { TOKENS, AGGREGATORS } from '../utils/contract.js';
+import {
+  formatVolume,
+  TOKENS,
+  AGGREGATORS,
+  AGGREGATOR_DISPLAY_NAMES
+} from '../utils/contract.js';
 
 // Format time period for display
 function formatTimePeriod(timeSinceFirst) {
@@ -52,27 +56,32 @@ export function StatsTable({ stats, loading }) {
             <thead>
               <tr>
                 <th>Token</th>
-                <th>Kyber Swap</th>
-                <th>ZeroX</th>
-                <th>New ZeroX</th>
+                {aggregatorNames.map((aggName) => (
+                  <th key={aggName}>{AGGREGATOR_DISPLAY_NAMES[aggName]}</th>
+                ))}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               {tokenNames.map((tokenName) => {
                 const tokenStats = stats.perToken[tokenName] || {};
-                const kyber1h = tokenStats.kyberSwap?.oneHour || '0';
-                const zeroX1h = tokenStats.zeroX?.oneHour || '0';
-                const spyros1h = tokenStats.spyros?.oneHour || '0';
-                const total1h = (BigInt(kyber1h) + BigInt(zeroX1h) + BigInt(spyros1h)).toString();
+                const total1h = aggregatorNames
+                  .reduce(
+                    (sum, aggName) =>
+                      sum + BigInt(tokenStats[aggName]?.oneHour || '0'),
+                    0n
+                  )
+                  .toString();
                 const displayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
 
                 return (
                   <tr key={tokenName}>
                     <td className="token-name">{displayName}</td>
-                    <td>${formatVolume(kyber1h)}</td>
-                    <td>${formatVolume(zeroX1h)}</td>
-                    <td>${formatVolume(spyros1h)}</td>
+                    {aggregatorNames.map((aggName) => (
+                      <td key={aggName}>
+                        ${formatVolume(tokenStats[aggName]?.oneHour || '0')}
+                      </td>
+                    ))}
                     <td className="total-cell">${formatVolume(total1h)}</td>
                   </tr>
                 );
@@ -104,7 +113,7 @@ export function StatsTable({ stats, loading }) {
                 const virtual1h = aggStats.virtual?.oneHour || '0';
                 const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(virtual1h)).toString();
 
-                const displayName = aggName === 'kyberSwap' ? 'Kyber Swap' : aggName === 'zeroX' ? 'ZeroX' : 'New ZeroX';
+                const displayName = AGGREGATOR_DISPLAY_NAMES[aggName];
                 return (
                   <tr key={aggName}>
                     <td className="aggregator-name">{displayName}</td>
@@ -143,27 +152,32 @@ export function StatsTable({ stats, loading }) {
             <thead>
               <tr>
                 <th>Token</th>
-                <th>Kyber Swap</th>
-                <th>ZeroX</th>
-                <th>New ZeroX</th>
+                {aggregatorNames.map((aggName) => (
+                  <th key={aggName}>{AGGREGATOR_DISPLAY_NAMES[aggName]}</th>
+                ))}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               {tokenNames.map((tokenName) => {
                 const tokenStats = stats.perToken[tokenName] || {};
-                const kyber24h = tokenStats.kyberSwap?.twentyFourHours || '0';
-                const zeroX24h = tokenStats.zeroX?.twentyFourHours || '0';
-                const spyros24h = tokenStats.spyros?.twentyFourHours || '0';
-                const total24h = (BigInt(kyber24h) + BigInt(zeroX24h) + BigInt(spyros24h)).toString();
+                const total24h = aggregatorNames
+                  .reduce(
+                    (sum, aggName) =>
+                      sum + BigInt(tokenStats[aggName]?.twentyFourHours || '0'),
+                    0n
+                  )
+                  .toString();
                 const displayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
 
                 return (
                   <tr key={tokenName}>
                     <td className="token-name">{displayName}</td>
-                    <td>${formatVolume(kyber24h)}</td>
-                    <td>${formatVolume(zeroX24h)}</td>
-                    <td>${formatVolume(spyros24h)}</td>
+                    {aggregatorNames.map((aggName) => (
+                      <td key={aggName}>
+                        ${formatVolume(tokenStats[aggName]?.twentyFourHours || '0')}
+                      </td>
+                    ))}
                     <td className="total-cell">${formatVolume(total24h)}</td>
                   </tr>
                 );
@@ -195,7 +209,7 @@ export function StatsTable({ stats, loading }) {
                 const virtual24h = aggStats.virtual?.twentyFourHours || '0';
                 const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(virtual24h)).toString();
 
-                const displayName = aggName === 'kyberSwap' ? 'Kyber Swap' : aggName === 'zeroX' ? 'ZeroX' : 'New ZeroX';
+                const displayName = AGGREGATOR_DISPLAY_NAMES[aggName];
                 return (
                   <tr key={aggName}>
                     <td className="aggregator-name">{displayName}</td>
