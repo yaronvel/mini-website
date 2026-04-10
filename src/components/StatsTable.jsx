@@ -54,7 +54,7 @@ export function StatsTable({ stats, loading }) {
                 <th>Token</th>
                 <th>Kyber Swap</th>
                 <th>ZeroX</th>
-                <th>Spyros</th>
+                <th>New ZeroX</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -104,7 +104,7 @@ export function StatsTable({ stats, loading }) {
                 const virtual1h = aggStats.virtual?.oneHour || '0';
                 const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(virtual1h)).toString();
 
-                const displayName = aggName === 'kyberSwap' ? 'Kyber Swap' : aggName === 'zeroX' ? 'ZeroX' : 'Spyros';
+                const displayName = aggName === 'kyberSwap' ? 'Kyber Swap' : aggName === 'zeroX' ? 'ZeroX' : 'New ZeroX';
                 return (
                   <tr key={aggName}>
                     <td className="aggregator-name">{displayName}</td>
@@ -145,7 +145,7 @@ export function StatsTable({ stats, loading }) {
                 <th>Token</th>
                 <th>Kyber Swap</th>
                 <th>ZeroX</th>
-                <th>Spyros</th>
+                <th>New ZeroX</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -195,7 +195,7 @@ export function StatsTable({ stats, loading }) {
                 const virtual24h = aggStats.virtual?.twentyFourHours || '0';
                 const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(virtual24h)).toString();
 
-                const displayName = aggName === 'kyberSwap' ? 'Kyber Swap' : aggName === 'zeroX' ? 'ZeroX' : 'Spyros';
+                const displayName = aggName === 'kyberSwap' ? 'Kyber Swap' : aggName === 'zeroX' ? 'ZeroX' : 'New ZeroX';
                 return (
                   <tr key={aggName}>
                     <td className="aggregator-name">{displayName}</td>

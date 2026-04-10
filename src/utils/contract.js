@@ -96,7 +96,7 @@ export const PNL_CONTRACT_ABI = [
 export const AGGREGATORS = {
   kyberSwap: '0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0',
   zeroX: '0xdc5d8200A030798BC6227240f68b4dD9542686ef',
-  spyros: '0xf76514845888d7Bb8b964EAa025fB3aD747E977B'
+  spyros: '0x7747F8D2a76BD6345Cc29622a946A929647F2359'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
