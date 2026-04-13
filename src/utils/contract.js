@@ -97,14 +97,16 @@ export const AGGREGATORS = {
   kyberSwap: '0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0',
   spyros: '0x7747F8D2a76BD6345Cc29622a946A929647F2359',
   router0x: '0x68A14203953130ae840e37DBe3d64c1E6858da7b',
-  intent0x: '0x6b6e87D2Cc438C287a5550a8732C302454E4382b'
+  intent0x: '0x6b6e87D2Cc438C287a5550a8732C302454E4382b',
+  okx: '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
   kyberSwap: 'Kyber Swap',
   spyros: 'normal 0x',
   router0x: 'router 0x',
-  intent0x: 'intent 0x'
+  intent0x: 'intent 0x',
+  okx: 'okx'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
