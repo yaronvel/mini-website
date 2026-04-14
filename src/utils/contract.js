@@ -134,6 +134,43 @@ export function getPnLContract(provider, blockNumber = null) {
   return new ethers.Contract(contractAddress, PNL_CONTRACT_ABI, provider);
 }
 
+export const SLIPPAGE_STEPS_CONTRACT_ADDRESS =
+  '0x3F1aa1C608544e4DE647F0aFE90e471edB239A74';
+
+export const SLIPPAGE_STEPS_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'getSlippageTokenData',
+    outputs: [
+      {
+        components: [
+          { internalType: 'uint256[5]', name: 'xQuote', type: 'uint256[5]' },
+          { internalType: 'uint256[5]', name: 'yQuote', type: 'uint256[5]' },
+          { internalType: 'uint256[5]', name: 'xBase', type: 'uint256[5]' },
+          { internalType: 'uint256[5]', name: 'yBase', type: 'uint256[5]' },
+          { internalType: 'uint256', name: 'timeSlippageSlope', type: 'uint256' }
+        ],
+        internalType: 'struct SlippageTokenData',
+        name: '',
+        type: 'tuple'
+      }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+export function getSlippageStepsContract(provider) {
+  return new ethers.Contract(
+    SLIPPAGE_STEPS_CONTRACT_ADDRESS,
+    SLIPPAGE_STEPS_ABI,
+    provider
+  );
+}
+
+/** Tokens shown on the steps display page (subset of TOKENS) */
+export const STEPS_DISPLAY_TOKEN_KEYS = ['weth', 'cbbtc', 'virtual'];
+
 // ERC20 ABI for balanceOf
 export const ERC20_ABI = [
   {

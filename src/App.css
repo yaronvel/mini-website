@@ -1077,3 +1077,148 @@
     padding: 0.4rem 0.3rem;
   }
 }
+
+/* Top navigation (all pages) */
+.app-top-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 0.75rem 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(100, 108, 255, 0.25);
+}
+
+.app-top-nav a {
+  color: #646cff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app-top-nav a:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-color-scheme: light) {
+  .app-top-nav {
+    border-bottom-color: rgba(100, 108, 255, 0.15);
+  }
+}
+
+/* Steps display page */
+.steps-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.steps-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.steps-header h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  background: linear-gradient(135deg, #646cff 0%, #535bf2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.steps-contract {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.steps-address {
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.steps-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.steps-token-section {
+  margin-bottom: 2.5rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid rgba(100, 108, 255, 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(100, 108, 255, 0.06) 0%,
+    rgba(83, 91, 242, 0.06) 100%
+  );
+}
+
+.steps-token-title {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.35rem;
+}
+
+.steps-token-address {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.steps-token-address code {
+  word-break: break-all;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.steps-block h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.steps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.steps-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-color-scheme: light) {
+  .steps-table td {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+.steps-idx {
+  width: 2.5rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.steps-val {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.steps-slope {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(100, 108, 255, 0.15);
+  font-size: 0.95rem;
+}
+
+.steps-slope-label {
+  font-weight: 600;
+}
