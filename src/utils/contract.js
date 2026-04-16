@@ -46,12 +46,29 @@ export const CONTRACT_ABI = [
   }
 ];
 
-// Target balance contract ABI
+// Target balance / imbalance curve contract ABI (subset used by the app)
 export const TARGET_BALANCE_CONTRACT_ABI = [
   {
     inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
     name: 'tokenTargetBalance',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'caps',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'slippageCurve',
+    outputs: [
+      { internalType: 'int256', name: 'a', type: 'int256' },
+      { internalType: 'int256', name: 'b', type: 'int256' }
+    ],
     stateMutability: 'view',
     type: 'function'
   }
@@ -168,8 +185,47 @@ export function getSlippageStepsContract(provider) {
   );
 }
 
-/** Tokens shown on the steps display page (subset of TOKENS) */
-export const STEPS_DISPLAY_TOKEN_KEYS = ['weth', 'cbbtc', 'virtual'];
+export const MEXICAN_PRICER_KYBER_ADDRESS =
+  '0x7FA55857511ddE798deA42FF64F2EE82dF7f7988';
+export const MEXICAN_PRICER_ZEROX_ADDRESS =
+  '0x015D847e2e77F2998eaA73013dE554B57935F729';
+
+/** Minimal ABI for configuration page (config + odds) */
+export const MEXICAN_PRICER_ABI = [
+  {
+    inputs: [],
+    name: 'config',
+    outputs: [
+      { internalType: 'uint64', name: 'avgNormalP', type: 'uint64' },
+      { internalType: 'uint64', name: 'stdNormalP', type: 'uint64' },
+      { internalType: 'uint64', name: 'gasPenaltySlope', type: 'uint64' },
+      { internalType: 'uint64', name: 'fixedFee', type: 'uint64' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'oddsForYes',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'oddsForNo',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+export function getMexicanPricerContract(provider, address) {
+  return new ethers.Contract(address, MEXICAN_PRICER_ABI, provider);
+}
+
+/** Tokens on configuration page: steps + imbalance curve (subset of TOKENS) */
+export const CONFIGURATION_TOKEN_KEYS = ['weth', 'cbbtc', 'virtual'];
 
 // ERC20 ABI for balanceOf
 export const ERC20_ABI = [

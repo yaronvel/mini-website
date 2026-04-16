@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
-import { StepsDisplay } from './pages/StepsDisplay';
+import { Configuration } from './pages/Configuration';
 import './App.css';
 
 const routerBasename =
@@ -12,11 +12,12 @@ export default function App() {
       <div className="App">
         <nav className="app-top-nav" aria-label="Main">
           <Link to="/">Home</Link>
-          <Link to="/steps">steps display</Link>
+          <Link to="/configuration">configuration</Link>
         </nav>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/steps" element={<StepsDisplay />} />
+          <Route path="/configuration" element={<Configuration />} />
+          <Route path="/steps" element={<Configuration />} />
         </Routes>
       </div>
     </BrowserRouter>
