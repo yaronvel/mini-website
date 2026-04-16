@@ -146,6 +146,8 @@ export function Configuration() {
     }
   }
 
+  // Load once per visit: no interval or polling. Re-fetch only when the user
+  // navigates away and opens this page again (component remount).
   useEffect(() => {
     let cancelled = false;
 
@@ -476,3 +478,5 @@ export function Configuration() {
     </div>
   );
 }
+
+export default Configuration;

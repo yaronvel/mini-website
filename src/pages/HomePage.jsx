@@ -33,8 +33,8 @@ export function HomePage() {
   useEffect(() => {
     fetchVolumeData();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchVolumeData, 30000);
+    // Refresh every 1 minute
+    const interval = setInterval(fetchVolumeData, 60000);
     return () => clearInterval(interval);
   }, []);
 
