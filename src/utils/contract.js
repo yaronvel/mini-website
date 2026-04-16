@@ -115,7 +115,8 @@ export const AGGREGATORS = {
   spyros: '0x7747F8D2a76BD6345Cc29622a946A929647F2359',
   router0x: '0x68A14203953130ae840e37DBe3d64c1E6858da7b',
   intent0x: '0x6b6e87D2Cc438C287a5550a8732C302454E4382b',
-  okx: '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8'
+  okx: '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8',
+  permissionless: '0xd35C6717cCa1E04696B694DCb1643Ac3620D2152'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
@@ -123,7 +124,8 @@ export const AGGREGATOR_DISPLAY_NAMES = {
   spyros: 'normal 0x',
   router0x: 'router 0x',
   intent0x: 'intent 0x',
-  okx: 'okx'
+  okx: 'okx',
+  permissionless: 'permissionless'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
