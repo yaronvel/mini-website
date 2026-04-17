@@ -112,6 +112,7 @@ export const PNL_CONTRACT_ABI = [
 // Aggregator addresses
 export const AGGREGATORS = {
   kyberSwap: '0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0',
+  kyberSwapNew: '0x8F10B468b06c6FD214B65F87778827F7D113f996',
   spyros: '0x7747F8D2a76BD6345Cc29622a946A929647F2359',
   router0x: '0x68A14203953130ae840e37DBe3d64c1E6858da7b',
   intent0x: '0x6b6e87D2Cc438C287a5550a8732C302454E4382b',
@@ -121,6 +122,7 @@ export const AGGREGATORS = {
 
 export const AGGREGATOR_DISPLAY_NAMES = {
   kyberSwap: 'Kyber Swap',
+  kyberSwapNew: 'kyber swap new',
   spyros: 'normal 0x',
   router0x: 'router 0x',
   intent0x: 'intent 0x',
