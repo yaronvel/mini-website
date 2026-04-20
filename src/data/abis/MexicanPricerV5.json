@@ -104,14 +104,24 @@
         "internalType": "uint64"
       },
       {
+        "name": "gasPenaltyFixed",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
         "name": "gasPenaltySlope",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "gasPenaltyCutoff",
+        "type": "uint48",
+        "internalType": "uint48"
       },
       {
         "name": "fixedFee",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint48",
+        "internalType": "uint48"
       }
     ],
     "stateMutability": "view"
@@ -531,7 +541,17 @@
     "name": "setGasPenalty",
     "inputs": [
       {
+        "name": "fixedPenalty",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "slop",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "cutoff",
         "type": "uint256",
         "internalType": "uint256"
       }

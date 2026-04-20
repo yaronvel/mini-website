@@ -190,11 +190,11 @@ export function getSlippageStepsContract(provider) {
 }
 
 export const MEXICAN_PRICER_KYBER_ADDRESS =
-  '0x7FA55857511ddE798deA42FF64F2EE82dF7f7988';
+  '0xD55143d3488954f67c6e565C09D82E720b2B93F3';
 export const MEXICAN_PRICER_ZEROX_ADDRESS =
-  '0x015D847e2e77F2998eaA73013dE554B57935F729';
+  '0x56CEe2171F895eCf8d2dB60567AbF7Ab959Cb84d';
 
-/** Minimal ABI for configuration page (config + odds) */
+/** MexicanPricerV5 — minimal ABI for configuration page (config + odds) */
 export const MEXICAN_PRICER_ABI = [
   {
     inputs: [],
@@ -202,8 +202,10 @@ export const MEXICAN_PRICER_ABI = [
     outputs: [
       { internalType: 'uint64', name: 'avgNormalP', type: 'uint64' },
       { internalType: 'uint64', name: 'stdNormalP', type: 'uint64' },
-      { internalType: 'uint64', name: 'gasPenaltySlope', type: 'uint64' },
-      { internalType: 'uint64', name: 'fixedFee', type: 'uint64' }
+      { internalType: 'uint16', name: 'gasPenaltyFixed', type: 'uint16' },
+      { internalType: 'uint16', name: 'gasPenaltySlope', type: 'uint16' },
+      { internalType: 'uint48', name: 'gasPenaltyCutoff', type: 'uint48' },
+      { internalType: 'uint48', name: 'fixedFee', type: 'uint48' }
     ],
     stateMutability: 'view',
     type: 'function'

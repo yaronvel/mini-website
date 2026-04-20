@@ -14,20 +14,27 @@ import {
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
-import mexicanPricerV4Abi from '../data/abis/MexicanPricerV4.json';
+import mexicanPricerV5Abi from '../data/abis/MexicanPricerV5.json';
+import whitelistSignersAbi from '../data/abis/WhitelistSigners.json';
 import '../App.css';
 
 const REFERENCE_ABIS_FOR_COPY = [
   { name: 'SwapImplV2', abi: swapImplV2Abi },
   { name: 'QuoteImpl', abi: quoteImplAbi },
-  { name: 'MexicanPricerV4', abi: mexicanPricerV4Abi }
+  { name: 'MexicanPricerV5', abi: mexicanPricerV5Abi },
+  { name: 'WhitelistSigners', abi: whitelistSignersAbi }
 ];
 
 const SWAP_IMPL_V2_ADDRESS = '0xc2Be7B94d5498b1acEb914F3a1dec4Ce502d235F';
 const QUOTE_IMPL_ADDRESS = '0x3F1aa1C608544e4DE647F0aFE90e471edB239A74';
+const WHITELIST_SIGNERS_ADDRESS =
+  '0xCa369e97cc161c3c3a7368f9bC55A47F36a0A91E';
 const UNISIG_ADDRESS = '0x351Bb653A688a26e263A0AFaf74cbf8854E32Cea';
 const UNISIG_SAFE_URL =
   'https://app.safe.global/apps/open?safe=base:0x351Bb653A688a26e263A0AFaf74cbf8854E32Cea';
+
+const IMBALANCE_UPDATE_ROLE =
+  '0x760974e959e60229fb4642c0b3ec64295da2f09d5abe0949f08577aeaac009f4';
 
 const XBASE_DECIMALS = {
   weth: 18,
@@ -77,8 +84,21 @@ function formatMexicanPricerRow(cfg, oddsYes, oddsNo) {
     cfg && typeof cfg === 'object' && 'avgNormalP' in cfg ? cfg.avgNormalP : cfg[0];
   const std =
     cfg && typeof cfg === 'object' && 'stdNormalP' in cfg ? cfg.stdNormalP : cfg[1];
+  const gasPenaltyFixedRaw =
+    cfg && typeof cfg === 'object' && 'gasPenaltyFixed' in cfg
+      ? cfg.gasPenaltyFixed
+      : cfg[2];
+  const gasPenaltySlopeRaw =
+    cfg && typeof cfg === 'object' && 'gasPenaltySlope' in cfg
+      ? cfg.gasPenaltySlope
+      : cfg[3];
+  const gasPenaltyCutoffRaw =
+    cfg && typeof cfg === 'object' && 'gasPenaltyCutoff' in cfg
+      ? cfg.gasPenaltyCutoff
+      : cfg[4];
+
   const fixed =
-    cfg && typeof cfg === 'object' && 'fixedFee' in cfg ? cfg.fixedFee : cfg[3];
+    cfg && typeof cfg === 'object' && 'fixedFee' in cfg ? cfg.fixedFee : cfg[5];
 
   const yes = toBigInt(oddsYes);
   const no = toBigInt(oddsNo);
@@ -97,6 +117,9 @@ function formatMexicanPricerRow(cfg, oddsYes, oddsNo) {
   return {
     avgNormalPBps: Number(toBigInt(avg)) / 100,
     stdNormalPBps: Number(toBigInt(std)) / 100,
+    gasPenaltyFixedBps: Number(toBigInt(gasPenaltyFixedRaw)) / 100,
+    gasPenaltySlopeBpsPer001Gwei: Number(toBigInt(gasPenaltySlopeRaw)) / 100,
+    gasPenaltyCutoffGwei: Number(toBigInt(gasPenaltyCutoffRaw)) / 1e9,
     fixedFeeBps: Number(toBigInt(fixed)) / 100,
     oddsYesPercent
   };
@@ -124,6 +147,20 @@ function formatBpsDisplay(n) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6
   })} bps`;
+}
+
+function formatBpsPer001GweiDisplay(n) {
+  return `${n.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
+  })} bps / 0.001 gwei`;
+}
+
+function formatGweiDisplay(n) {
+  return `${n.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 9
+  })} gwei`;
 }
 
 export function Configuration() {
@@ -410,6 +447,12 @@ export function Configuration() {
                           (oddsForYes / (oddsForYes + oddsForNo))
                         </span>
                       </dd>
+                      <dt>gasPenaltyFixed (bps, on-chain / 100)</dt>
+                      <dd>{formatBpsDisplay(row.gasPenaltyFixedBps)}</dd>
+                      <dt>gasPenaltyCutoff (gwei, on-chain / 1e9)</dt>
+                      <dd>{formatGweiDisplay(row.gasPenaltyCutoffGwei)}</dd>
+                      <dt>gasPenaltySlope (bps per 0.001 gwei, on-chain / 100)</dt>
+                      <dd>{formatBpsPer001GweiDisplay(row.gasPenaltySlopeBpsPer001Gwei)}</dd>
                     </dl>
                   </section>
                 );
@@ -438,6 +481,10 @@ export function Configuration() {
             <dd>
               <code>{QUOTE_IMPL_ADDRESS}</code>
             </dd>
+            <dt>WhitelistSigners</dt>
+            <dd>
+              <code>{WHITELIST_SIGNERS_ADDRESS}</code>
+            </dd>
             <dt>unisig</dt>
             <dd>
               <a
@@ -448,6 +495,10 @@ export function Configuration() {
               >
                 {UNISIG_ADDRESS}
               </a>
+            </dd>
+            <dt>Imbalance Update role</dt>
+            <dd>
+              <code>{IMBALANCE_UPDATE_ROLE}</code>
             </dd>
           </dl>
 
