@@ -36,6 +36,15 @@ const UNISIG_SAFE_URL =
 const IMBALANCE_UPDATE_ROLE =
   '0x760974e959e60229fb4642c0b3ec64295da2f09d5abe0949f08577aeaac009f4';
 
+const PROP_AMM_WRAPPER_ADDRESS =
+  '0xd35C6717cCa1E04696B694DCb1643Ac3620D2152';
+const KYBERSWAP_AGGREGATOR_ADDRESS =
+  '0x8F10B468b06c6FD214B65F87778827F7D113f996';
+const ZEROX_NORMAL_AGGREGATOR_ADDRESS =
+  '0x7747F8D2a76BD6345Cc29622a946A929647F2359';
+const OKX_AGGREGATOR_ADDRESS =
+  '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8';
+
 const XBASE_DECIMALS = {
   weth: 18,
   cbbtc: 8,
@@ -480,6 +489,22 @@ export function Configuration() {
             <dt>QuoteImpl</dt>
             <dd>
               <code>{QUOTE_IMPL_ADDRESS}</code>
+            </dd>
+            <dt>PropAMMWrapper</dt>
+            <dd>
+              <code>{PROP_AMM_WRAPPER_ADDRESS}</code>
+            </dd>
+            <dt>kyberswap</dt>
+            <dd>
+              <code>{KYBERSWAP_AGGREGATOR_ADDRESS}</code>
+            </dd>
+            <dt>0x normal</dt>
+            <dd>
+              <code>{ZEROX_NORMAL_AGGREGATOR_ADDRESS}</code>
+            </dd>
+            <dt>okx</dt>
+            <dd>
+              <code>{OKX_AGGREGATOR_ADDRESS}</code>
             </dd>
             <dt>WhitelistSigners</dt>
             <dd>
