@@ -10,7 +10,8 @@ import {
   TARGET_BALANCE_CONTRACT_ADDRESS,
   CONFIGURATION_TOKEN_KEYS,
   MEXICAN_PRICER_KYBER_ADDRESS,
-  MEXICAN_PRICER_ZEROX_ADDRESS
+  MEXICAN_PRICER_ZEROX_ADDRESS,
+  MEXICAN_PRICER_PERMISSIONLESS_ADDRESS
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
@@ -65,7 +66,12 @@ const MEXICAN_PRICER_SOURCES = [
     title: 'Kyber Swap',
     address: MEXICAN_PRICER_KYBER_ADDRESS
   },
-  { key: 'zeroX', title: '0x', address: MEXICAN_PRICER_ZEROX_ADDRESS }
+  { key: 'zeroX', title: '0x', address: MEXICAN_PRICER_ZEROX_ADDRESS },
+  {
+    key: 'permissionless',
+    title: 'Permissionless',
+    address: MEXICAN_PRICER_PERMISSIONLESS_ADDRESS
+  }
 ];
 
 function toBigInt(v) {
@@ -137,17 +143,26 @@ function formatMexicanPricerRow(cfg, oddsYes, oddsNo) {
 async function loadMexicanPricerSnapshot(provider) {
   const kyber = getMexicanPricerContract(provider, MEXICAN_PRICER_KYBER_ADDRESS);
   const zeroX = getMexicanPricerContract(provider, MEXICAN_PRICER_ZEROX_ADDRESS);
-  const [kCfg, kYes, kNo, zCfg, zYes, zNo] = await Promise.all([
-    kyber.config(),
-    kyber.oddsForYes(),
-    kyber.oddsForNo(),
-    zeroX.config(),
-    zeroX.oddsForYes(),
-    zeroX.oddsForNo()
-  ]);
+  const permissionless = getMexicanPricerContract(
+    provider,
+    MEXICAN_PRICER_PERMISSIONLESS_ADDRESS
+  );
+  const [kCfg, kYes, kNo, zCfg, zYes, zNo, pCfg, pYes, pNo] =
+    await Promise.all([
+      kyber.config(),
+      kyber.oddsForYes(),
+      kyber.oddsForNo(),
+      zeroX.config(),
+      zeroX.oddsForYes(),
+      zeroX.oddsForNo(),
+      permissionless.config(),
+      permissionless.oddsForYes(),
+      permissionless.oddsForNo()
+    ]);
   return {
     kyber: formatMexicanPricerRow(kCfg, kYes, kNo),
-    zeroX: formatMexicanPricerRow(zCfg, zYes, zNo)
+    zeroX: formatMexicanPricerRow(zCfg, zYes, zNo),
+    permissionless: formatMexicanPricerRow(pCfg, pYes, pNo)
   };
 }
 
