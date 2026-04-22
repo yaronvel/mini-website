@@ -209,11 +209,7 @@ export function HomePage() {
         // Read PnL at current, 1h ago, and 24h ago blocks
         // Use appropriate contract address based on block number
         const readPnL = async (blockTag, retries = 3) => {
-          // Get the appropriate contract for this block number
           const pnlContract = getPnLContract(provider, blockTag);
-          const pnlContractAddress = pnlContract.target;
-          console.log(`PnL Contract Address for block ${blockTag}:`, pnlContractAddress);
-          
           for (let attempt = 1; attempt <= retries; attempt++) {
             try {
               const result = await pnlContract.pnl({ blockTag });
@@ -265,6 +261,34 @@ export function HomePage() {
 
         // Calculate differences
         const totalSinceFirst = pnlCurrentNumber; // cumulative PnL at head (contract view)
+
+        {
+          const totalSinceContract = getPnLContract(provider, blocks.current);
+          const labelTs = firstBlockTsResolved;
+          const labelText =
+            labelTs != null
+              ? new Date(labelTs * 1000).toLocaleString()
+              : `(block ${FIRST_BLOCK} — timestamp pending)`;
+          console.group('[PropAMM] PnL — "Total since {first block time}" row (full calculation)');
+          console.log(
+            '1) What the date means: the label is the wall-clock time of FIRST_BLOCK, which is an anchor for display only.'
+          );
+          console.log('   FIRST_BLOCK:', FIRST_BLOCK, '| label shown:', `Total since ${labelText}:`);
+          console.log(
+            '2) The number is NOT a delta since that time. It is the on-chain pnl() at the *current head* block, scaled for display (see below).'
+          );
+          console.log('3) blockTag passed to pnl() { blockTag: … }:', blocks.current);
+          console.log('4) Contract (getPnLContract(provider, that block)):', totalSinceContract.target);
+          console.log('5) pnl() return (int256, raw string):', pnlCurrent.toString());
+          console.log('6) Scaling: display = Number(BigInt(pnl() raw)) / 1e36');
+          console.log('7) pnl() as BigInt (for precision check):', pnlCurrentBigInt.toString());
+          console.log('8) totalSinceFirst (what the UI shows for that row):', totalSinceFirst);
+          console.log(
+            '9) If you need change since first block, that would be pnl(current) and pnl(FIRST_BLOCK) on their respective historical contracts, then compare scaled values (not done for this label).'
+          );
+          console.groupEnd();
+        }
+
         const pnl1hChange = blocks.hasFull1hData ? pnlCurrentNumber - pnl1hNumber : null;
         const pnl24hChange = blocks.hasFull24hData ? pnlCurrentNumber - pnl24hNumber : null;
         const pnlSinceAnchor31d = hasFullAnchor31dData

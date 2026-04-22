@@ -93,10 +93,21 @@ export const TOKEN_DECIMALS = {
 // Target balance contract address
 export const TARGET_BALANCE_CONTRACT_ADDRESS = '0xe00B0150bA21625353b69d82b3ec28a9A744B0C7';
 
-// PnL contract addresses
-export const PNL_CONTRACT_ADDRESS_OLD = '0xeE1C69BCAfb34b13cCEA4137ba056a87255bBFd2';
-export const PNL_CONTRACT_ADDRESS_NEW = '0x64CdcC66a9943862bd4E3B608016A71bC9Ab860B';
+// PnL contract addresses (by on-chain block when reading historical pnl())
+export const PNL_CONTRACT_ADDRESS_EARLIEST =
+  '0x1b2Bfed2092532701e5C5DA69a0796989c094290';
+export const PNL_CONTRACT_ADDRESS_OLD =
+  '0xeE1C69BCAfb34b13cCEA4137ba056a87255bBFd2';
+export const PNL_CONTRACT_ADDRESS_NEW =
+  '0x64CdcC66a9943862bd4E3B608016A71bC9Ab860B';
+export const PNL_CONTRACT_ADDRESS_LATEST =
+  '0xD728CaE14Cb5cecA6544827C065D7802eDC215a0';
+/** Inclusive end block for earliest PnL contract; from 44041150 use OLD until NEW threshold */
+export const PNL_CONTRACT_FIRST_ERA_END_BLOCK = 44041149;
+/** First block (inclusive) for NEW PnL contract */
 export const PNL_CONTRACT_BLOCK_THRESHOLD = 44691628;
+/** First block (inclusive) for current PnL contract (replaces NEW from this height) */
+export const PNL_CONTRACT_LATEST_BLOCK_THRESHOLD = 45030435;
 
 // PnL contract ABI
 export const PNL_CONTRACT_ABI = [
@@ -148,10 +159,25 @@ export function getTargetBalanceContract(provider) {
 }
 
 export function getPnLContract(provider, blockNumber = null) {
-  // If blockNumber is provided and >= threshold, use new contract, otherwise use old contract
-  const contractAddress = (blockNumber !== null && blockNumber >= PNL_CONTRACT_BLOCK_THRESHOLD) 
-    ? PNL_CONTRACT_ADDRESS_NEW 
-    : PNL_CONTRACT_ADDRESS_OLD;
+  // No block: assume current head deployment
+  if (blockNumber == null) {
+    return new ethers.Contract(
+      PNL_CONTRACT_ADDRESS_LATEST,
+      PNL_CONTRACT_ABI,
+      provider
+    );
+  }
+  const n = typeof blockNumber === 'bigint' ? Number(blockNumber) : blockNumber;
+  let contractAddress;
+  if (n <= PNL_CONTRACT_FIRST_ERA_END_BLOCK) {
+    contractAddress = PNL_CONTRACT_ADDRESS_EARLIEST;
+  } else if (n < PNL_CONTRACT_BLOCK_THRESHOLD) {
+    contractAddress = PNL_CONTRACT_ADDRESS_OLD;
+  } else if (n < PNL_CONTRACT_LATEST_BLOCK_THRESHOLD) {
+    contractAddress = PNL_CONTRACT_ADDRESS_NEW;
+  } else {
+    contractAddress = PNL_CONTRACT_ADDRESS_LATEST;
+  }
   return new ethers.Contract(contractAddress, PNL_CONTRACT_ABI, provider);
 }
 
