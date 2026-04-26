@@ -751,19 +751,16 @@ export function HomePage() {
                 </div>
               </div>
               <div className="token-balance-item">
-                <div className="token-balance-header">
-                  <span className="token-balance-name">max allowed loss</span>
-                </div>
-                <div className="token-balance-value pnl-value positive pnb-circuit-cube-value">
-                  {sanityPnl.maxAllowedLoss.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 6
-                  })}
-                </div>
-              </div>
-              <div className="token-balance-item">
-                <div className="token-balance-header">
+                <div className="pnb-circuit-cube-header-column">
                   <span className="token-balance-name">current loss</span>
+                  <span className="pnb-circuit-max-allowed">
+                    (max allowed{' '}
+                    {sanityPnl.maxAllowedLoss.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 6
+                    })}
+                    )
+                  </span>
                 </div>
                 <div
                   className={`token-balance-value pnl-value pnb-circuit-cube-value ${
