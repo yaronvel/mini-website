@@ -335,6 +335,10 @@
   border-radius: 4px;
 }
 
+.pnl-card.sanity-pnl-card {
+  margin-top: 1.25rem;
+}
+
 .pnl-card {
   margin-top: 2rem;
   padding: 1.5rem;

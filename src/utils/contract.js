@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import sanityPnlAbi from '../data/abis/SanityPnl.json';
 
 // Contract configuration
 export const CONTRACT_ADDRESS = '0xA05dE8fedaF5d47a6A8726811cC5f387BEf1F816';
@@ -179,6 +180,13 @@ export function getPnLContract(provider, blockNumber = null) {
     contractAddress = PNL_CONTRACT_ADDRESS_LATEST;
   }
   return new ethers.Contract(contractAddress, PNL_CONTRACT_ABI, provider);
+}
+
+export const SANITY_PNL_ADDRESS =
+  '0xAe5a436533ED3019B12D92A443865b8912629324';
+
+export function getSanityPnlContract(provider) {
+  return new ethers.Contract(SANITY_PNL_ADDRESS, sanityPnlAbi, provider);
 }
 
 export const SLIPPAGE_STEPS_CONTRACT_ADDRESS =

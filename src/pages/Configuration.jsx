@@ -11,19 +11,22 @@ import {
   CONFIGURATION_TOKEN_KEYS,
   MEXICAN_PRICER_KYBER_ADDRESS,
   MEXICAN_PRICER_ZEROX_ADDRESS,
-  MEXICAN_PRICER_OKX_ADDRESS
+  MEXICAN_PRICER_OKX_ADDRESS,
+  SANITY_PNL_ADDRESS
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
 import mexicanPricerV5Abi from '../data/abis/MexicanPricerV5.json';
 import whitelistSignersAbi from '../data/abis/WhitelistSigners.json';
+import sanityPnlAbi from '../data/abis/SanityPnl.json';
 import '../App.css';
 
 const REFERENCE_ABIS_FOR_COPY = [
   { name: 'SwapImplV2', abi: swapImplV2Abi },
   { name: 'QuoteImpl', abi: quoteImplAbi },
   { name: 'MexicanPricerV5', abi: mexicanPricerV5Abi },
-  { name: 'WhitelistSigners', abi: whitelistSignersAbi }
+  { name: 'WhitelistSigners', abi: whitelistSignersAbi },
+  { name: 'SanityPnl', abi: sanityPnlAbi }
 ];
 
 const SWAP_IMPL_V2_ADDRESS = '0xc2Be7B94d5498b1acEb914F3a1dec4Ce502d235F';
@@ -516,6 +519,10 @@ export function Configuration() {
             <dt>WhitelistSigners</dt>
             <dd>
               <code>{WHITELIST_SIGNERS_ADDRESS}</code>
+            </dd>
+            <dt>SanityPnl</dt>
+            <dd>
+              <code>{SANITY_PNL_ADDRESS}</code>
             </dd>
             <dt>unisig</dt>
             <dd>

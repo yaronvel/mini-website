@@ -6,6 +6,7 @@ import {
   getContract, 
   getTargetBalanceContract,
   getPnLContract,
+  getSanityPnlContract,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -27,6 +28,7 @@ export function HomePage() {
   const [walletValue, setWalletValue] = useState(null);
   const [tokenBalances, setTokenBalances] = useState(null);
   const [pnl, setPnl] = useState(null);
+  const [sanityPnl, setSanityPnl] = useState(null);
   const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
   const [minUSDValue, setMinUSDValue] = useState(null);
 
@@ -326,6 +328,28 @@ export function HomePage() {
         setPnl(null);
       }
 
+      try {
+        const sc = getSanityPnlContract(provider);
+        const pnl0 = sc.getFunction('pnl()');
+        const [ref, maxL, p0] = await Promise.all([
+          sc.referencePnl(),
+          sc.maxLoss(),
+          pnl0()
+        ]);
+        const refB = BigInt(ref.toString());
+        const pB = BigInt(p0.toString());
+        const maxB = BigInt(maxL.toString());
+        const scale = 1e36;
+        setSanityPnl({
+          referencePnl: Number(refB) / scale,
+          maxAllowedLoss: Number(maxB) / scale,
+          delta: Number(pB - refB) / scale
+        });
+      } catch (e) {
+        console.warn('SanityPnl fetch failed:', e);
+        setSanityPnl(null);
+      }
+
       // Fetch volume data for all combinations
       const volumeData = {};
 
@@ -462,6 +486,7 @@ export function HomePage() {
       setLoading(false);
       setIsInitialLoad(false);
     } catch (err) {
+      setSanityPnl(null);
       console.error('Error fetching volume data:', err);
       // Only show errors for critical failures (network, provider issues)
       // Contract call reverts are handled silently in readVolume
@@ -701,6 +726,47 @@ export function HomePage() {
                   </span>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {sanityPnl !== null && (
+          <div className="pnl-card sanity-pnl-card">
+            <h3 className="pnl-title">Pnl Circuit Breaker</h3>
+            <div className="pnl-items">
+              <div className="pnl-item">
+                <span className="pnl-label">referencePnl:</span>
+                <span
+                  className={`pnl-value ${sanityPnl.referencePnl >= 0 ? 'positive' : 'negative'}`}
+                >
+                  {sanityPnl.referencePnl >= 0 ? '+' : ''}
+                  {sanityPnl.referencePnl.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
+              </div>
+              <div className="pnl-item">
+                <span className="pnl-label">max allowed loss:</span>
+                <span className="pnl-value positive">
+                  {sanityPnl.maxAllowedLoss.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 6
+                  })}
+                </span>
+              </div>
+              <div className="pnl-item">
+                <span className="pnl-label">current loss:</span>
+                <span
+                  className={`pnl-value ${sanityPnl.delta >= 0 ? 'positive' : 'negative'}`}
+                >
+                  {sanityPnl.delta >= 0 ? '+' : ''}
+                  {sanityPnl.delta.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
+              </div>
             </div>
           </div>
         )}
