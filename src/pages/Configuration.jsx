@@ -11,7 +11,7 @@ import {
   CONFIGURATION_TOKEN_KEYS,
   MEXICAN_PRICER_KYBER_ADDRESS,
   MEXICAN_PRICER_ZEROX_ADDRESS,
-  MEXICAN_PRICER_PERMISSIONLESS_ADDRESS
+  MEXICAN_PRICER_OKX_ADDRESS
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
@@ -67,11 +67,7 @@ const MEXICAN_PRICER_SOURCES = [
     address: MEXICAN_PRICER_KYBER_ADDRESS
   },
   { key: 'zeroX', title: '0x', address: MEXICAN_PRICER_ZEROX_ADDRESS },
-  {
-    key: 'permissionless',
-    title: 'Permissionless',
-    address: MEXICAN_PRICER_PERMISSIONLESS_ADDRESS
-  }
+  { key: 'okX', title: 'OKX', address: MEXICAN_PRICER_OKX_ADDRESS }
 ];
 
 function toBigInt(v) {
@@ -143,26 +139,22 @@ function formatMexicanPricerRow(cfg, oddsYes, oddsNo) {
 async function loadMexicanPricerSnapshot(provider) {
   const kyber = getMexicanPricerContract(provider, MEXICAN_PRICER_KYBER_ADDRESS);
   const zeroX = getMexicanPricerContract(provider, MEXICAN_PRICER_ZEROX_ADDRESS);
-  const permissionless = getMexicanPricerContract(
-    provider,
-    MEXICAN_PRICER_PERMISSIONLESS_ADDRESS
-  );
-  const [kCfg, kYes, kNo, zCfg, zYes, zNo, pCfg, pYes, pNo] =
-    await Promise.all([
-      kyber.config(),
-      kyber.oddsForYes(),
-      kyber.oddsForNo(),
-      zeroX.config(),
-      zeroX.oddsForYes(),
-      zeroX.oddsForNo(),
-      permissionless.config(),
-      permissionless.oddsForYes(),
-      permissionless.oddsForNo()
-    ]);
+  const okX = getMexicanPricerContract(provider, MEXICAN_PRICER_OKX_ADDRESS);
+  const [kCfg, kYes, kNo, zCfg, zYes, zNo, oCfg, oYes, oNo] = await Promise.all([
+    kyber.config(),
+    kyber.oddsForYes(),
+    kyber.oddsForNo(),
+    zeroX.config(),
+    zeroX.oddsForYes(),
+    zeroX.oddsForNo(),
+    okX.config(),
+    okX.oddsForYes(),
+    okX.oddsForNo()
+  ]);
   return {
     kyber: formatMexicanPricerRow(kCfg, kYes, kNo),
     zeroX: formatMexicanPricerRow(zCfg, zYes, zNo),
-    permissionless: formatMexicanPricerRow(pCfg, pYes, pNo)
+    okX: formatMexicanPricerRow(oCfg, oYes, oNo)
   };
 }
 
