@@ -731,41 +731,51 @@ export function HomePage() {
         )}
 
         {sanityPnl !== null && (
-          <div className="pnl-card sanity-pnl-card">
-            <h3 className="pnl-title">Pnl Circuit Breaker</h3>
-            <div className="pnl-items">
-              <div className="pnl-item">
-                <span className="pnl-label">referencePnl:</span>
-                <span
-                  className={`pnl-value ${sanityPnl.referencePnl >= 0 ? 'positive' : 'negative'}`}
+          <div className="token-balances-card pnb-circuit-card">
+            <h3 className="token-balances-title">Pnl Circuit Breaker</h3>
+            <div className="token-balances-grid">
+              <div className="token-balance-item">
+                <div className="token-balance-header">
+                  <span className="token-balance-name">referencePnl</span>
+                </div>
+                <div
+                  className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                    sanityPnl.referencePnl >= 0 ? 'positive' : 'negative'
+                  }`}
                 >
                   {sanityPnl.referencePnl >= 0 ? '+' : ''}
                   {sanityPnl.referencePnl.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}
-                </span>
+                </div>
               </div>
-              <div className="pnl-item">
-                <span className="pnl-label">max allowed loss:</span>
-                <span className="pnl-value positive">
+              <div className="token-balance-item">
+                <div className="token-balance-header">
+                  <span className="token-balance-name">max allowed loss</span>
+                </div>
+                <div className="token-balance-value pnl-value positive pnb-circuit-cube-value">
                   {sanityPnl.maxAllowedLoss.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 6
                   })}
-                </span>
+                </div>
               </div>
-              <div className="pnl-item">
-                <span className="pnl-label">current loss:</span>
-                <span
-                  className={`pnl-value ${sanityPnl.delta >= 0 ? 'positive' : 'negative'}`}
+              <div className="token-balance-item">
+                <div className="token-balance-header">
+                  <span className="token-balance-name">current loss</span>
+                </div>
+                <div
+                  className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                    sanityPnl.delta >= 0 ? 'positive' : 'negative'
+                  }`}
                 >
                   {sanityPnl.delta >= 0 ? '+' : ''}
                   {sanityPnl.delta.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}
-                </span>
+                </div>
               </div>
             </div>
           </div>

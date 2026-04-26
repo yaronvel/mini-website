@@ -335,8 +335,15 @@
   border-radius: 4px;
 }
 
-.pnl-card.sanity-pnl-card {
+.pnb-circuit-card {
   margin-top: 1.25rem;
+}
+
+.pnb-circuit-cube-value {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 
 .pnl-card {
