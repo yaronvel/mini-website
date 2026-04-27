@@ -689,41 +689,44 @@ export function HomePage() {
         {pnl !== null && (
           <div className="pnl-card">
             <h3 className="pnl-title">PnL Statistics</h3>
-            <div className="pnl-items">
+            <div className="token-balances-grid pnl-stats-cubes">
               {pnl.totalSinceFirst !== null && pnl.totalSinceFirst !== undefined && (
-                <div className="pnl-item">
-                  <span className="pnl-label">
-                    {(pnl.firstBlockLabelTs ?? firstBlockTimestamp) != null
-                      ? `Total since ${new Date((pnl.firstBlockLabelTs ?? firstBlockTimestamp) * 1000).toLocaleString()}:`
-                      : `Total since block ${FIRST_BLOCK}:`}
-                  </span>
-                  <span className={`pnl-value ${pnl.totalSinceFirst >= 0 ? 'positive' : 'negative'}`}>
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">Total</span>
+                  </div>
+                  <div
+                    className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                      pnl.totalSinceFirst >= 0 ? 'positive' : 'negative'
+                    }`}
+                  >
                     {pnl.totalSinceFirst >= 0 ? '+' : ''}
                     {pnl.totalSinceFirst.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
                     })}
-                  </span>
+                  </div>
                 </div>
               )}
 
               {pnl.sinceAnchor31d !== null &&
                 pnl.sinceAnchor31d !== undefined &&
                 pnl.sinceAnchor31dTimestamp != null && (
-                  <div className="pnl-item">
-                    <span className="pnl-label">
-                      Since{' '}
-                      {new Date(pnl.sinceAnchor31dTimestamp * 1000).toLocaleString()}:
-                    </span>
-                    <span
-                      className={`pnl-value ${pnl.sinceAnchor31d >= 0 ? 'positive' : 'negative'}`}
+                  <div className="token-balance-item">
+                    <div className="token-balance-header">
+                      <span className="token-balance-name">April</span>
+                    </div>
+                    <div
+                      className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                        pnl.sinceAnchor31d >= 0 ? 'positive' : 'negative'
+                      }`}
                     >
                       {pnl.sinceAnchor31d >= 0 ? '+' : ''}
                       {pnl.sinceAnchor31d.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })}
-                    </span>
+                    </div>
                   </div>
                 )}
 
@@ -731,42 +734,59 @@ export function HomePage() {
                 pnl.firstUntilAnchor31d !== undefined &&
                 (pnl.firstBlockLabelTs ?? firstBlockTimestamp) != null &&
                 pnl.sinceAnchor31dTimestamp != null && (
-                  <div className="pnl-item">
-                    <span className="pnl-label">
-                      Since{' '}
-                      {new Date((pnl.firstBlockLabelTs ?? firstBlockTimestamp) * 1000).toLocaleString()}{' '}
-                      until{' '}
-                      {new Date(pnl.sinceAnchor31dTimestamp * 1000).toLocaleString()}:
-                    </span>
-                    <span
-                      className={`pnl-value ${pnl.firstUntilAnchor31d >= 0 ? 'positive' : 'negative'}`}
+                  <div className="token-balance-item">
+                    <div className="token-balance-header">
+                      <span className="token-balance-name">March</span>
+                    </div>
+                    <div
+                      className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                        pnl.firstUntilAnchor31d >= 0 ? 'positive' : 'negative'
+                      }`}
                     >
                       {pnl.firstUntilAnchor31d >= 0 ? '+' : ''}
                       {pnl.firstUntilAnchor31d.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })}
-                    </span>
+                    </div>
                   </div>
                 )}
-              
-              {/* PnL in last 1h */}
+
               {pnl.oneHour !== null && pnl.oneHour !== undefined && (
-                <div className="pnl-item">
-                  <span className="pnl-label">Last 1h:</span>
-                  <span className={`pnl-value ${pnl.oneHour >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl.oneHour >= 0 ? '+' : ''}{pnl.oneHour.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">Last 1h</span>
+                  </div>
+                  <div
+                    className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                      pnl.oneHour >= 0 ? 'positive' : 'negative'
+                    }`}
+                  >
+                    {pnl.oneHour >= 0 ? '+' : ''}
+                    {pnl.oneHour.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </div>
                 </div>
               )}
-              
-              {/* PnL in last 24h */}
+
               {pnl.twentyFourHours !== null && pnl.twentyFourHours !== undefined && (
-                <div className="pnl-item">
-                  <span className="pnl-label">Last 24h:</span>
-                  <span className={`pnl-value ${pnl.twentyFourHours >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl.twentyFourHours >= 0 ? '+' : ''}{pnl.twentyFourHours.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">Last 24h</span>
+                  </div>
+                  <div
+                    className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                      pnl.twentyFourHours >= 0 ? 'positive' : 'negative'
+                    }`}
+                  >
+                    {pnl.twentyFourHours >= 0 ? '+' : ''}
+                    {pnl.twentyFourHours.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </div>
                 </div>
               )}
             </div>
