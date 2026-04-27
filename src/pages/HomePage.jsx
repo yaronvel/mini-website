@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { StatsTable } from '../components/StatsTable';
+import { PnlHourlyChart } from '../components/PnlHourlyChart';
 import { 
   getProvider, 
   getContract, 
@@ -13,7 +14,8 @@ import {
   USDC_DIVISOR,
   ERC20_ABI,
   FIRST_BLOCK,
-  PNL_ANCHOR_BLOCK
+  PNL_ANCHOR_BLOCK,
+  BLOCK_TIME_SECONDS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
 import '../App.css';
@@ -314,6 +316,46 @@ export function HomePage() {
           'first until anchor+31d': pnlFirstBlockUntilAnchor31d
         });
 
+        const blocksPerHour = Math.floor(3600 / BLOCK_TIME_SECONDS);
+        const pnlHourlyRaw = await Promise.all(
+          Array.from({ length: 25 }, (_, i) => {
+            const h = 24 - i;
+            const b = Math.max(FIRST_BLOCK, blocks.current - h * blocksPerHour);
+            return readPnL(b);
+          })
+        );
+        const hourlySeries = Array.from({ length: 24 }, (_, i) => {
+          const rawPrev = pnlHourlyRaw[i];
+          const rawNext = pnlHourlyRaw[i + 1];
+          const pPrev = BigInt(
+            typeof rawPrev === 'bigint' ? rawPrev : rawPrev.toString()
+          );
+          const pNext = BigInt(
+            typeof rawNext === 'bigint' ? rawNext : rawNext.toString()
+          );
+          const diff = pNext - pPrev;
+          return {
+            slot: i,
+            label:
+              i === 23
+                ? '1h ago → now: ΔPnl vs previous hour'
+                : `${24 - i}h → ${24 - i - 1}h ago: ΔPnl vs previous hour`,
+            pnl: Number(diff) / 1e36
+          };
+        });
+
+        {
+          const pv = hourlySeries.map((d) => d.pnl);
+          const mn = Math.min(...pv);
+          const mx = Math.max(...pv);
+          console.log('[PropAMM] Hourly PnL delta — 24 points (display ÷1e36):', pv);
+          console.log(
+            '[PropAMM] Hourly PnL delta min / max:',
+            mn,
+            mx
+          );
+        }
+
         setPnl({
           totalSinceFirst,
           firstBlockLabelTs: firstBlockTsResolved,
@@ -321,7 +363,8 @@ export function HomePage() {
           sinceAnchor31dTimestamp: anchor31dTimestamp,
           firstUntilAnchor31d: pnlFirstBlockUntilAnchor31d,
           oneHour: pnl1hChange,
-          twentyFourHours: pnl24hChange
+          twentyFourHours: pnl24hChange,
+          hourlySeries
         });
       } catch (error) {
         console.error('Error fetching PnL:', error);
@@ -727,6 +770,9 @@ export function HomePage() {
                 </div>
               )}
             </div>
+            {pnl.hourlySeries && pnl.hourlySeries.length > 0 && (
+              <PnlHourlyChart hourlySeries={pnl.hourlySeries} />
+            )}
           </div>
         )}
 
