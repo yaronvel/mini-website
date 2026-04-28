@@ -14,11 +14,11 @@ import {
   MEXICAN_PRICER_OKX_ADDRESS,
   SANITY_PNL_ADDRESS,
   CIRCUIT_BREAKER_ADDRESS,
-  CIRCUIT_BREAKER_ABI
+  CIRCUIT_BREAKER_ABI,
+  MEXICAN_PRICER_ABI
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
-import mexicanPricerV5Abi from '../data/abis/MexicanPricerV5.json';
 import whitelistSignersAbi from '../data/abis/WhitelistSigners.json';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
 import '../App.css';
@@ -26,7 +26,7 @@ import '../App.css';
 const REFERENCE_ABIS_FOR_COPY = [
   { name: 'SwapImplV2', abi: swapImplV2Abi },
   { name: 'QuoteImpl', abi: quoteImplAbi },
-  { name: 'MexicanPricerV5', abi: mexicanPricerV5Abi },
+  { name: 'MexicanPricerV6', abi: MEXICAN_PRICER_ABI },
   { name: 'WhitelistSigners', abi: whitelistSignersAbi },
   { name: 'SanityPnl', abi: sanityPnlAbi },
   { name: 'CircuitBreaker', abi: CIRCUIT_BREAKER_ABI }
@@ -116,6 +116,12 @@ function formatMexicanPricerRow(cfg, oddsYes, oddsNo) {
 
   const fixed =
     cfg && typeof cfg === 'object' && 'fixedFee' in cfg ? cfg.fixedFee : cfg[5];
+  const antiPRaw =
+    cfg && typeof cfg === 'object' && 'antiP' in cfg ? cfg.antiP : cfg[6];
+  const antiPThresholdRaw =
+    cfg && typeof cfg === 'object' && 'antiPThreshold' in cfg
+      ? cfg.antiPThreshold
+      : cfg[7];
 
   const yes = toBigInt(oddsYes);
   const no = toBigInt(oddsNo);
@@ -138,8 +144,20 @@ function formatMexicanPricerRow(cfg, oddsYes, oddsNo) {
     gasPenaltySlopeBpsPer001Gwei: Number(toBigInt(gasPenaltySlopeRaw)) / 100,
     gasPenaltyCutoffGwei: Number(toBigInt(gasPenaltyCutoffRaw)) / 1e9,
     fixedFeeBps: Number(toBigInt(fixed)) / 100,
-    oddsYesPercent
+    oddsYesPercent,
+    antiPBps: Number(toBigInt(antiPRaw)) / 100,
+    antiPThresholdUsd: formatMexicanAntiPThresholdUsd(antiPThresholdRaw)
   };
+}
+
+function formatMexicanAntiPThresholdUsd(raw) {
+  const n = Number(toBigInt(raw));
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
+  }).format(n);
 }
 
 async function loadMexicanPricerSnapshot(provider) {
@@ -475,6 +493,10 @@ export function Configuration() {
                       <dd>{formatGweiDisplay(row.gasPenaltyCutoffGwei)}</dd>
                       <dt>gasPenaltySlope (bps per 0.001 gwei, on-chain / 100)</dt>
                       <dd>{formatBpsPer001GweiDisplay(row.gasPenaltySlopeBpsPer001Gwei)}</dd>
+                      <dt>antiP (bps, on-chain / 100)</dt>
+                      <dd>{formatBpsDisplay(row.antiPBps)}</dd>
+                      <dt>antiPThreshold ($)</dt>
+                      <dd>{row.antiPThresholdUsd}</dd>
                     </dl>
                   </section>
                 );

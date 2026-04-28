@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
 import circuitBreakerAbi from '../data/abis/CircuitBreaker.json';
+import mexicanPricerV6Abi from '../data/abis/MexicanPricerV6.json';
 
 // Contract configuration
 export const CONTRACT_ADDRESS = '0xA05dE8fedaF5d47a6A8726811cC5f387BEf1F816';
@@ -197,43 +198,14 @@ export function getSlippageStepsContract(provider) {
 }
 
 export const MEXICAN_PRICER_KYBER_ADDRESS =
-  '0xD55143d3488954f67c6e565C09D82E720b2B93F3';
+  '0x2C4B2Eb2242D81DBe66a9a63a9f80fc6d272a33b';
 export const MEXICAN_PRICER_ZEROX_ADDRESS =
-  '0x56CEe2171F895eCf8d2dB60567AbF7Ab959Cb84d';
+  '0x6c47cFfa780603E8930D1dBcc5D0c98fd576859e';
 export const MEXICAN_PRICER_OKX_ADDRESS =
-  '0x72E1533588F8589C52158Aa236e1229D2d5DD6A1';
+  '0x29ce0351EE32982007CDFF41702C4eABf408EBFb';
 
-/** MexicanPricerV5 — minimal ABI for configuration page (config + odds) */
-export const MEXICAN_PRICER_ABI = [
-  {
-    inputs: [],
-    name: 'config',
-    outputs: [
-      { internalType: 'uint64', name: 'avgNormalP', type: 'uint64' },
-      { internalType: 'uint64', name: 'stdNormalP', type: 'uint64' },
-      { internalType: 'uint16', name: 'gasPenaltyFixed', type: 'uint16' },
-      { internalType: 'uint16', name: 'gasPenaltySlope', type: 'uint16' },
-      { internalType: 'uint48', name: 'gasPenaltyCutoff', type: 'uint48' },
-      { internalType: 'uint48', name: 'fixedFee', type: 'uint48' }
-    ],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [],
-    name: 'oddsForYes',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [],
-    name: 'oddsForNo',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  }
-];
+/** MexicanPricerV6 — ABI for configuration widget (full contract; decode uses JSON). */
+export const MEXICAN_PRICER_ABI = mexicanPricerV6Abi;
 
 export function getMexicanPricerContract(provider, address) {
   return new ethers.Contract(address, MEXICAN_PRICER_ABI, provider);

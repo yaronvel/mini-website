@@ -26,6 +26,11 @@
         "name": "_name",
         "type": "string",
         "internalType": "string"
+      },
+      {
+        "name": "_usdc",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -95,13 +100,13 @@
     "outputs": [
       {
         "name": "avgNormalP",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint32",
+        "internalType": "uint32"
       },
       {
         "name": "stdNormalP",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint32",
+        "internalType": "uint32"
       },
       {
         "name": "gasPenaltyFixed",
@@ -122,6 +127,16 @@
         "name": "fixedFee",
         "type": "uint48",
         "internalType": "uint48"
+      },
+      {
+        "name": "antiP",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "antiPThreshold",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
@@ -486,6 +501,24 @@
   },
   {
     "type": "function",
+    "name": "setAnitP",
+    "inputs": [
+      {
+        "name": "antiPVal",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "thresholdInUSDVal",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setBpsChange",
     "inputs": [
       {
@@ -696,6 +729,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "usdc",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",
