@@ -12,7 +12,9 @@ import {
   MEXICAN_PRICER_KYBER_ADDRESS,
   MEXICAN_PRICER_ZEROX_ADDRESS,
   MEXICAN_PRICER_OKX_ADDRESS,
-  SANITY_PNL_ADDRESS
+  SANITY_PNL_ADDRESS,
+  CIRCUIT_BREAKER_ADDRESS,
+  CIRCUIT_BREAKER_ABI
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
@@ -26,7 +28,8 @@ const REFERENCE_ABIS_FOR_COPY = [
   { name: 'QuoteImpl', abi: quoteImplAbi },
   { name: 'MexicanPricerV5', abi: mexicanPricerV5Abi },
   { name: 'WhitelistSigners', abi: whitelistSignersAbi },
-  { name: 'SanityPnl', abi: sanityPnlAbi }
+  { name: 'SanityPnl', abi: sanityPnlAbi },
+  { name: 'CircuitBreaker', abi: CIRCUIT_BREAKER_ABI }
 ];
 
 const SWAP_IMPL_V2_ADDRESS = '0xc2Be7B94d5498b1acEb914F3a1dec4Ce502d235F';
@@ -503,6 +506,10 @@ export function Configuration() {
             <dt>PropAMMWrapper</dt>
             <dd>
               <code>{PROP_AMM_WRAPPER_ADDRESS}</code>
+            </dd>
+            <dt>Circuit breaker</dt>
+            <dd>
+              <code>{CIRCUIT_BREAKER_ADDRESS}</code>
             </dd>
             <dt>kyberswap</dt>
             <dd>

@@ -1,8 +1,13 @@
 import { ethers } from 'ethers';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
+import circuitBreakerAbi from '../data/abis/CircuitBreaker.json';
 
 // Contract configuration
 export const CONTRACT_ADDRESS = '0xA05dE8fedaF5d47a6A8726811cC5f387BEf1F816';
+/** Same deployment as {@link CONTRACT_ADDRESS} — swap / wallet / volume / min USD interface. */
+export const CIRCUIT_BREAKER_ADDRESS = CONTRACT_ADDRESS;
+/** Full circuit breaker ABI (copy also lives in `src/data/abis/CircuitBreaker.json`). */
+export const CIRCUIT_BREAKER_ABI = circuitBreakerAbi;
 // Base RPC endpoint - Infura
 // Uses environment variable if available, otherwise falls back to default
 export const BASE_RPC_URL = import.meta.env.VITE_INFURA_URL || 'https://base-mainnet.infura.io/v3/0ec938da607340d3bf91f8b60306f147';
@@ -12,40 +17,8 @@ export const BLOCK_TIME_SECONDS = 2;
 export const PNL_ANCHOR_BLOCK =
   FIRST_BLOCK + (31 * 24 * 3600) / BLOCK_TIME_SECONDS;
 
-// Contract ABI - volume, getWalletValue, wallet, and minUSDValue functions
-export const CONTRACT_ABI = [
-  {
-    inputs: [
-      { internalType: 'address', name: 'dexAggregator', type: 'address' },
-      { internalType: 'address', name: 'token', type: 'address' }
-    ],
-    name: 'volume',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [],
-    name: 'getWalletValue',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [],
-    name: 'wallet',
-    outputs: [{ internalType: 'address', name: '', type: 'address' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [],
-    name: 'minUSDValue',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  }
-];
+/** App entry contract — same ABI as {@link CIRCUIT_BREAKER_ABI}. */
+export const CONTRACT_ABI = circuitBreakerAbi;
 
 // Target balance / imbalance curve contract ABI (subset used by the app)
 export const TARGET_BALANCE_CONTRACT_ABI = [
