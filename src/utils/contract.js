@@ -14,9 +14,20 @@ export const CIRCUIT_BREAKER_ABI = circuitBreakerAbi;
 export const BASE_RPC_URL = import.meta.env.VITE_INFURA_URL || 'https://base-mainnet.infura.io/v3/0ec938da607340d3bf91f8b60306f147';
 export const FIRST_BLOCK = 42784272;
 export const BLOCK_TIME_SECONDS = 2;
-/** FIRST_BLOCK + 31 days, assuming exactly 2 seconds per block */
+/** FIRST_BLOCK + 31 days, assuming exactly {@link BLOCK_TIME_SECONDS} seconds per block */
 export const PNL_ANCHOR_BLOCK =
   FIRST_BLOCK + (31 * 24 * 3600) / BLOCK_TIME_SECONDS;
+
+/** Same block — start of April window in the dashboard. */
+export const PNL_APRIL_START_BLOCK = PNL_ANCHOR_BLOCK;
+
+/** Duration of April cube: thirty 24h periods in blocks (= 3600 * 24 * 30 / block time). */
+export const PNL_APRIL_DURATION_BLOCKS =
+  (30 * 24 * 3600) / BLOCK_TIME_SECONDS;
+
+/** First block of May; April inclusive window is {@link PNL_APRIL_START_BLOCK} … (this − 1). */
+export const PNL_MAY_START_BLOCK =
+  PNL_APRIL_START_BLOCK + PNL_APRIL_DURATION_BLOCKS;
 
 /** App entry contract — same ABI as {@link CIRCUIT_BREAKER_ABI}. */
 export const CONTRACT_ABI = circuitBreakerAbi;

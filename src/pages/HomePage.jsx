@@ -15,6 +15,7 @@ import {
   ERC20_ABI,
   FIRST_BLOCK,
   PNL_ANCHOR_BLOCK,
+  PNL_MAY_START_BLOCK,
   BLOCK_TIME_SECONDS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
@@ -229,13 +230,51 @@ export function HomePage() {
           return 0n;
         };
 
+        /** May Δ uses SanityPnl's <code>pnl()</code> at the fixed dashboard address; same scaling (÷ 1e36). */
+        const readSanityPnlAtBlock = async (blockTag, retries = 3) => {
+          const sanity = getSanityPnlContract(provider);
+          const pnlFn = sanity.getFunction('pnl()');
+          for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+              return await pnlFn({ blockTag });
+            } catch (error) {
+              if (attempt === retries) {
+                console.warn(
+                  `SanityPnl.pnl call reverted at block ${blockTag} after ${retries} attempts`
+                );
+                return 0n;
+              }
+              await new Promise(resolve => setTimeout(resolve, attempt * 100));
+            }
+          }
+          return 0n;
+        };
+
         const hasFullAnchor31dData = blocks.current >= PNL_ANCHOR_BLOCK;
-        const [pnlCurrent, pnl1h, pnl24h, pnlAtFirstBlock, pnlAtAnchor31d] = await Promise.all([
+        const hasReachedMayStart = blocks.current >= PNL_MAY_START_BLOCK;
+        const aprilFrozenEndBlock =
+          PNL_MAY_START_BLOCK > 0 ? PNL_MAY_START_BLOCK - 1 : FIRST_BLOCK;
+
+        const [
+          pnlCurrent,
+          pnl1h,
+          pnl24h,
+          pnlAtFirstBlock,
+          pnlAtAnchor31d,
+          pnlAtAprilFrozenEnd,
+          sanityPnlMayStartRaw,
+          sanityPnlMayHeadRaw
+        ] = await Promise.all([
           readPnL(blocks.current),
           readPnL(blocks.oneHourAgo),
           readPnL(blocks.twentyFourHoursAgo),
           hasFullAnchor31dData ? readPnL(FIRST_BLOCK) : Promise.resolve(0n),
-          hasFullAnchor31dData ? readPnL(PNL_ANCHOR_BLOCK) : Promise.resolve(0n)
+          hasFullAnchor31dData ? readPnL(PNL_ANCHOR_BLOCK) : Promise.resolve(0n),
+          hasFullAnchor31dData && hasReachedMayStart
+            ? readPnL(aprilFrozenEndBlock)
+            : Promise.resolve(0n),
+          hasReachedMayStart ? readSanityPnlAtBlock(PNL_MAY_START_BLOCK) : Promise.resolve(0n),
+          hasReachedMayStart ? readSanityPnlAtBlock(blocks.current) : Promise.resolve(0n)
         ]);
 
         let anchor31dTimestamp = null;
@@ -250,18 +289,39 @@ export function HomePage() {
           }
         }
 
+        let mayStartTimestamp = null;
+        if (hasReachedMayStart) {
+          try {
+            const mayBlock = await provider.getBlock(PNL_MAY_START_BLOCK);
+            if (mayBlock && mayBlock.timestamp != null) {
+              mayStartTimestamp = Number(mayBlock.timestamp);
+            }
+          } catch (e) {
+            console.warn('Failed to fetch May start block timestamp:', e);
+          }
+        }
+
         // Convert to numbers and divide by 1e36
         const pnlCurrentBigInt = typeof pnlCurrent === 'bigint' ? pnlCurrent : BigInt(pnlCurrent.toString());
         const pnl1hBigInt = typeof pnl1h === 'bigint' ? pnl1h : BigInt(pnl1h.toString());
         const pnl24hBigInt = typeof pnl24h === 'bigint' ? pnl24h : BigInt(pnl24h.toString());
         const pnlAtFirstBigInt = typeof pnlAtFirstBlock === 'bigint' ? pnlAtFirstBlock : BigInt(pnlAtFirstBlock.toString());
-        const pnlAtAnchorBigInt = typeof pnlAtAnchor31d === 'bigint' ? pnlAtAnchor31d : BigInt(pnlAtAnchor31d.toString());
+        const pnlAtAnchorBigInt =
+          typeof pnlAtAnchor31d === 'bigint'
+            ? pnlAtAnchor31d
+            : BigInt(pnlAtAnchor31d.toString());
+        const pnlAtAprilFrozenEndBigInt =
+          typeof pnlAtAprilFrozenEnd === 'bigint'
+            ? pnlAtAprilFrozenEnd
+            : BigInt((pnlAtAprilFrozenEnd ?? 0n).toString());
 
         const pnlCurrentNumber = Number(pnlCurrentBigInt) / 1e36;
         const pnl1hNumber = Number(pnl1hBigInt) / 1e36;
         const pnl24hNumber = Number(pnl24hBigInt) / 1e36;
         const pnlAtFirstNumber = Number(pnlAtFirstBigInt) / 1e36;
         const pnlAtAnchorNumber = Number(pnlAtAnchorBigInt) / 1e36;
+        const pnlAprilFrozenEndNumber =
+          Number(pnlAtAprilFrozenEndBigInt) / 1e36;
 
         // Calculate differences
         const totalSinceFirst = pnlCurrentNumber; // cumulative PnL at head (contract view)
@@ -295,9 +355,27 @@ export function HomePage() {
 
         const pnl1hChange = blocks.hasFull1hData ? pnlCurrentNumber - pnl1hNumber : null;
         const pnl24hChange = blocks.hasFull24hData ? pnlCurrentNumber - pnl24hNumber : null;
-        const pnlSinceAnchor31d = hasFullAnchor31dData
-          ? pnlCurrentNumber - pnlAtAnchorNumber
-          : null;
+        const pnlAprilWindow =
+          hasFullAnchor31dData
+            ? hasReachedMayStart
+              ? pnlAprilFrozenEndNumber - pnlAtAnchorNumber
+              : pnlCurrentNumber - pnlAtAnchorNumber
+            : null;
+        const sanityMayStartBi =
+          typeof sanityPnlMayStartRaw === 'bigint'
+            ? sanityPnlMayStartRaw
+            : BigInt((sanityPnlMayStartRaw ?? 0n).toString());
+        const sanityMayHeadBi =
+          typeof sanityPnlMayHeadRaw === 'bigint'
+            ? sanityPnlMayHeadRaw
+            : BigInt((sanityPnlMayHeadRaw ?? 0n).toString());
+        /** Sanity <code>pnl()</code> before May must not run (reverts); value is <code>0</code>. After May starts, deltas use historical reads (reverts fall back to <code>0n</code> per read). */
+        const pnlMayWindow =
+          hasFullAnchor31dData
+            ? hasReachedMayStart
+              ? Number(sanityMayHeadBi - sanityMayStartBi) / 1e36
+              : 0
+            : null;
         const pnlFirstBlockUntilAnchor31d =
           hasFullAnchor31dData &&
           firstBlockTsResolved != null &&
@@ -312,8 +390,10 @@ export function HomePage() {
           totalSinceFirst,
           '1h change': pnl1hChange,
           '24h change': pnl24hChange,
-          'since anchor+31d': pnlSinceAnchor31d,
-          'first until anchor+31d': pnlFirstBlockUntilAnchor31d
+          'April (lineage Δ; frozen when past May start)': pnlAprilWindow,
+          May: pnlMayWindow,
+          MAY_START_BLOCK: PNL_MAY_START_BLOCK,
+          'first → April start (March)': pnlFirstBlockUntilAnchor31d
         });
 
         const blocksPerHour = Math.floor(3600 / BLOCK_TIME_SECONDS);
@@ -359,8 +439,10 @@ export function HomePage() {
         setPnl({
           totalSinceFirst,
           firstBlockLabelTs: firstBlockTsResolved,
-          sinceAnchor31d: pnlSinceAnchor31d,
+          sinceAnchor31d: pnlAprilWindow,
           sinceAnchor31dTimestamp: anchor31dTimestamp,
+          sinceMayStart: pnlMayWindow,
+          sinceMayStartTimestamp: mayStartTimestamp,
           firstUntilAnchor31d: pnlFirstBlockUntilAnchor31d,
           oneHour: pnl1hChange,
           twentyFourHours: pnl24hChange,
@@ -702,6 +784,25 @@ export function HomePage() {
                   >
                     {pnl.totalSinceFirst >= 0 ? '+' : ''}
                     {pnl.totalSinceFirst.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {pnl.sinceMayStart !== null && pnl.sinceMayStart !== undefined && (
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">May</span>
+                  </div>
+                  <div
+                    className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                      pnl.sinceMayStart >= 0 ? 'positive' : 'negative'
+                    }`}
+                  >
+                    {pnl.sinceMayStart >= 0 ? '+' : ''}
+                    {pnl.sinceMayStart.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
                     })}
