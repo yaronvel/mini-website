@@ -16,6 +16,7 @@ import {
   FIRST_BLOCK,
   PNL_ANCHOR_BLOCK,
   PNL_MAY_START_BLOCK,
+  PNL_JUNE_START_BLOCK,
   BLOCK_TIME_SECONDS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
@@ -252,8 +253,14 @@ export function HomePage() {
 
         const hasFullAnchor31dData = blocks.current >= PNL_ANCHOR_BLOCK;
         const hasReachedMayStart = blocks.current >= PNL_MAY_START_BLOCK;
+        const hasReachedJuneStart = blocks.current >= PNL_JUNE_START_BLOCK;
         const aprilFrozenEndBlock =
           PNL_MAY_START_BLOCK > 0 ? PNL_MAY_START_BLOCK - 1 : FIRST_BLOCK;
+        const mayFrozenEndBlock =
+          PNL_JUNE_START_BLOCK > 0 ? PNL_JUNE_START_BLOCK - 1 : PNL_MAY_START_BLOCK;
+        const mayHeadSanityBlock = hasReachedJuneStart
+          ? mayFrozenEndBlock
+          : blocks.current;
 
         const [
           pnlCurrent,
@@ -263,7 +270,9 @@ export function HomePage() {
           pnlAtAnchor31d,
           pnlAtAprilFrozenEnd,
           sanityPnlMayStartRaw,
-          sanityPnlMayHeadRaw
+          sanityPnlMayEndRaw,
+          sanityPnlJuneStartRaw,
+          sanityPnlJuneHeadRaw
         ] = await Promise.all([
           readPnL(blocks.current),
           readPnL(blocks.oneHourAgo),
@@ -273,8 +282,18 @@ export function HomePage() {
           hasFullAnchor31dData && hasReachedMayStart
             ? readPnL(aprilFrozenEndBlock)
             : Promise.resolve(0n),
-          hasReachedMayStart ? readSanityPnlAtBlock(PNL_MAY_START_BLOCK) : Promise.resolve(0n),
-          hasReachedMayStart ? readSanityPnlAtBlock(blocks.current) : Promise.resolve(0n)
+          hasReachedMayStart
+            ? readSanityPnlAtBlock(PNL_MAY_START_BLOCK)
+            : Promise.resolve(0n),
+          hasReachedMayStart
+            ? readSanityPnlAtBlock(mayHeadSanityBlock)
+            : Promise.resolve(0n),
+          hasReachedJuneStart
+            ? readSanityPnlAtBlock(PNL_JUNE_START_BLOCK)
+            : Promise.resolve(0n),
+          hasReachedJuneStart
+            ? readSanityPnlAtBlock(blocks.current)
+            : Promise.resolve(0n)
         ]);
 
         let anchor31dTimestamp = null;
@@ -298,6 +317,18 @@ export function HomePage() {
             }
           } catch (e) {
             console.warn('Failed to fetch May start block timestamp:', e);
+          }
+        }
+
+        let juneStartTimestamp = null;
+        if (hasReachedJuneStart) {
+          try {
+            const juneBlock = await provider.getBlock(PNL_JUNE_START_BLOCK);
+            if (juneBlock && juneBlock.timestamp != null) {
+              juneStartTimestamp = Number(juneBlock.timestamp);
+            }
+          } catch (e) {
+            console.warn('Failed to fetch June start block timestamp:', e);
           }
         }
 
@@ -365,15 +396,30 @@ export function HomePage() {
           typeof sanityPnlMayStartRaw === 'bigint'
             ? sanityPnlMayStartRaw
             : BigInt((sanityPnlMayStartRaw ?? 0n).toString());
-        const sanityMayHeadBi =
-          typeof sanityPnlMayHeadRaw === 'bigint'
-            ? sanityPnlMayHeadRaw
-            : BigInt((sanityPnlMayHeadRaw ?? 0n).toString());
-        /** Sanity <code>pnl()</code> before May must not run (reverts); value is <code>0</code>. After May starts, deltas use historical reads (reverts fall back to <code>0n</code> per read). */
+        const sanityMayEndBi =
+          typeof sanityPnlMayEndRaw === 'bigint'
+            ? sanityPnlMayEndRaw
+            : BigInt((sanityPnlMayEndRaw ?? 0n).toString());
+        const sanityJuneStartBi =
+          typeof sanityPnlJuneStartRaw === 'bigint'
+            ? sanityPnlJuneStartRaw
+            : BigInt((sanityPnlJuneStartRaw ?? 0n).toString());
+        const sanityJuneHeadBi =
+          typeof sanityPnlJuneHeadRaw === 'bigint'
+            ? sanityPnlJuneHeadRaw
+            : BigInt((sanityPnlJuneHeadRaw ?? 0n).toString());
+        /** Sanity <code>pnl()</code> before May must not run (reverts); value is <code>0</code>. Frozen when June starts. */
         const pnlMayWindow =
           hasFullAnchor31dData
             ? hasReachedMayStart
-              ? Number(sanityMayHeadBi - sanityMayStartBi) / 1e36
+              ? Number(sanityMayEndBi - sanityMayStartBi) / 1e36
+              : 0
+            : null;
+        /** Same Sanity contract; <code>0</code> until {@link PNL_JUNE_START_BLOCK}. */
+        const pnlJuneWindow =
+          hasFullAnchor31dData
+            ? hasReachedJuneStart
+              ? Number(sanityJuneHeadBi - sanityJuneStartBi) / 1e36
               : 0
             : null;
         const pnlFirstBlockUntilAnchor31d =
@@ -392,7 +438,9 @@ export function HomePage() {
           '24h change': pnl24hChange,
           'April (lineage Δ; frozen when past May start)': pnlAprilWindow,
           May: pnlMayWindow,
+          June: pnlJuneWindow,
           MAY_START_BLOCK: PNL_MAY_START_BLOCK,
+          JUNE_START_BLOCK: PNL_JUNE_START_BLOCK,
           'first → April start (March)': pnlFirstBlockUntilAnchor31d
         });
 
@@ -443,6 +491,8 @@ export function HomePage() {
           sinceAnchor31dTimestamp: anchor31dTimestamp,
           sinceMayStart: pnlMayWindow,
           sinceMayStartTimestamp: mayStartTimestamp,
+          sinceJuneStart: pnlJuneWindow,
+          sinceJuneStartTimestamp: juneStartTimestamp,
           firstUntilAnchor31d: pnlFirstBlockUntilAnchor31d,
           oneHour: pnl1hChange,
           twentyFourHours: pnl24hChange,
@@ -784,6 +834,25 @@ export function HomePage() {
                   >
                     {pnl.totalSinceFirst >= 0 ? '+' : ''}
                     {pnl.totalSinceFirst.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {pnl.sinceJuneStart !== null && pnl.sinceJuneStart !== undefined && (
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">June</span>
+                  </div>
+                  <div
+                    className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+                      pnl.sinceJuneStart >= 0 ? 'positive' : 'negative'
+                    }`}
+                  >
+                    {pnl.sinceJuneStart >= 0 ? '+' : ''}
+                    {pnl.sinceJuneStart.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
                     })}

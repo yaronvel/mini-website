@@ -29,6 +29,14 @@ export const PNL_APRIL_DURATION_BLOCKS =
 export const PNL_MAY_START_BLOCK =
   PNL_APRIL_START_BLOCK + PNL_APRIL_DURATION_BLOCKS;
 
+/** Duration of May window: 31 days in blocks (= 31 × 24 × 3600 / block time). */
+export const PNL_MAY_DURATION_BLOCKS =
+  (31 * 24 * 3600) / BLOCK_TIME_SECONDS;
+
+/** First block of June; May inclusive window is {@link PNL_MAY_START_BLOCK} … (this − 1). */
+export const PNL_JUNE_START_BLOCK =
+  PNL_MAY_START_BLOCK + PNL_MAY_DURATION_BLOCKS;
+
 /** App entry contract — same ABI as {@link CIRCUIT_BREAKER_ABI}. */
 export const CONTRACT_ABI = circuitBreakerAbi;
 
