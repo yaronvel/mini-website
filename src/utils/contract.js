@@ -206,6 +206,61 @@ export function getProtocolFeesContract(provider) {
   );
 }
 
+const PROTOCOL_FEES_USD_SCALE = 1e36;
+
+/** Sum of protocol fees since June 1st, in USD (already ÷ 1e36). */
+export async function fetchProtocolFeesSinceJune(provider, currentBlock) {
+  const feesContract = getProtocolFeesContract(provider);
+  const sanityContract = getSanityPnlContract(provider);
+
+  const readFees = async (tokenAddress, blockTag, retries = 3) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const result = await feesContract.fees(tokenAddress, { blockTag });
+        return BigInt(result.toString());
+      } catch (error) {
+        if (attempt === retries) {
+          console.warn(
+            `Protocol fees call reverted at block ${blockTag} after ${retries} attempts`
+          );
+          return 0n;
+        }
+        await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+      }
+    }
+    return 0n;
+  };
+
+  const juneBaselineBlock =
+    currentBlock >= PNL_JUNE_START_BLOCK ? PNL_JUNE_START_BLOCK : null;
+
+  let totalUsdRaw = 0n;
+
+  for (const tokenKey of PROTOCOL_FEE_TOKEN_KEYS) {
+    const tokenAddress = TOKENS[tokenKey];
+    const [feesCurrent, feesJuneStart] = await Promise.all([
+      readFees(tokenAddress, currentBlock),
+      juneBaselineBlock != null
+        ? readFees(tokenAddress, juneBaselineBlock)
+        : Promise.resolve(0n)
+    ]);
+
+    const feeDeltaWei = feesCurrent - feesJuneStart;
+
+    try {
+      const usdResult = await sanityContract.getUSDValue(
+        tokenAddress,
+        feeDeltaWei
+      );
+      totalUsdRaw += BigInt(usdResult.toString());
+    } catch (error) {
+      console.warn(`getUSDValue failed for ${tokenKey}:`, error);
+    }
+  }
+
+  return Number(totalUsdRaw) / PROTOCOL_FEES_USD_SCALE;
+}
+
 export const SLIPPAGE_STEPS_CONTRACT_ADDRESS =
   '0x3F1aa1C608544e4DE647F0aFE90e471edB239A74';
 

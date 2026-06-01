@@ -8,7 +8,7 @@ import {
   getTargetBalanceContract,
   getPnLContract,
   getSanityPnlContract,
-  getProtocolFeesContract,
+  fetchProtocolFeesSinceJune,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -18,8 +18,7 @@ import {
   PNL_ANCHOR_BLOCK,
   PNL_MAY_START_BLOCK,
   PNL_JUNE_START_BLOCK,
-  BLOCK_TIME_SECONDS,
-  PROTOCOL_FEE_TOKEN_KEYS
+  BLOCK_TIME_SECONDS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
 import '../App.css';
@@ -78,6 +77,18 @@ export function HomePage() {
 
       // Calculate block numbers
       const blocks = calculateBlockNumbers(blockInfo.blockNumber, blockInfo.timestamp);
+
+      let feesSinceJune = 0;
+      try {
+        feesSinceJune = await fetchProtocolFeesSinceJune(
+          provider,
+          blocks.current
+        );
+        setProtocolFees({ sinceJuneStart: feesSinceJune });
+      } catch (e) {
+        console.warn('Protocol fees fetch failed:', e);
+        setProtocolFees(null);
+      }
 
       // Fetch wallet value at different block heights
       const readWalletValue = async (blockTag, retries = 3) => {
@@ -425,6 +436,10 @@ export function HomePage() {
               ? Number(sanityJuneHeadBi - sanityJuneStartBi) / 1e36
               : 0
             : null;
+        const pnlJuneExcludingFees =
+          pnlJuneWindow != null && hasReachedJuneStart
+            ? pnlJuneWindow - feesSinceJune
+            : pnlJuneWindow;
         const pnlFirstBlockUntilAnchor31d =
           hasFullAnchor31dData &&
           firstBlockTsResolved != null &&
@@ -442,6 +457,8 @@ export function HomePage() {
           'April (lineage Δ; frozen when past May start)': pnlAprilWindow,
           May: pnlMayWindow,
           June: pnlJuneWindow,
+          'June (excluding fees)': pnlJuneExcludingFees,
+          feesSinceJune,
           MAY_START_BLOCK: PNL_MAY_START_BLOCK,
           JUNE_START_BLOCK: PNL_JUNE_START_BLOCK,
           'first → April start (March)': pnlFirstBlockUntilAnchor31d
@@ -494,7 +511,7 @@ export function HomePage() {
           sinceAnchor31dTimestamp: anchor31dTimestamp,
           sinceMayStart: pnlMayWindow,
           sinceMayStartTimestamp: mayStartTimestamp,
-          sinceJuneStart: pnlJuneWindow,
+          sinceJuneStart: pnlJuneExcludingFees,
           sinceJuneStartTimestamp: juneStartTimestamp,
           firstUntilAnchor31d: pnlFirstBlockUntilAnchor31d,
           oneHour: pnl1hChange,
@@ -526,64 +543,6 @@ export function HomePage() {
       } catch (e) {
         console.warn('SanityPnl fetch failed:', e);
         setSanityPnl(null);
-      }
-
-      try {
-        const feesContract = getProtocolFeesContract(provider);
-        const sanityContract = getSanityPnlContract(provider);
-        const scale = 1e36;
-
-        const readFees = async (tokenAddress, blockTag, retries = 3) => {
-          for (let attempt = 1; attempt <= retries; attempt++) {
-            try {
-              const result = await feesContract.fees(tokenAddress, { blockTag });
-              return BigInt(result.toString());
-            } catch (error) {
-              if (attempt === retries) {
-                console.warn(
-                  `Protocol fees call reverted at block ${blockTag} after ${retries} attempts`
-                );
-                return 0n;
-              }
-              await new Promise((resolve) => setTimeout(resolve, attempt * 100));
-            }
-          }
-          return 0n;
-        };
-
-        const juneBaselineBlock =
-          blocks.current >= PNL_JUNE_START_BLOCK ? PNL_JUNE_START_BLOCK : null;
-
-        let totalUsdRaw = 0n;
-
-        for (const tokenKey of PROTOCOL_FEE_TOKEN_KEYS) {
-          const tokenAddress = TOKENS[tokenKey];
-          const [feesCurrent, feesJuneStart] = await Promise.all([
-            readFees(tokenAddress, blocks.current),
-            juneBaselineBlock != null
-              ? readFees(tokenAddress, juneBaselineBlock)
-              : Promise.resolve(0n)
-          ]);
-
-          const feeDeltaWei = feesCurrent - feesJuneStart;
-
-          try {
-            const usdResult = await sanityContract.getUSDValue(
-              tokenAddress,
-              feeDeltaWei
-            );
-            totalUsdRaw += BigInt(usdResult.toString());
-          } catch (error) {
-            console.warn(`getUSDValue failed for ${tokenKey}:`, error);
-          }
-        }
-
-        setProtocolFees({
-          sinceJuneStart: Number(totalUsdRaw) / scale
-        });
-      } catch (e) {
-        console.warn('Protocol fees fetch failed:', e);
-        setProtocolFees(null);
       }
 
       // Fetch volume data for all combinations
@@ -906,7 +865,7 @@ export function HomePage() {
               {pnl.sinceJuneStart !== null && pnl.sinceJuneStart !== undefined && (
                 <div className="token-balance-item">
                   <div className="token-balance-header">
-                    <span className="token-balance-name">June</span>
+                    <span className="token-balance-name">June (excluding fees)</span>
                   </div>
                   <div
                     className={`token-balance-value pnl-value pnb-circuit-cube-value ${
