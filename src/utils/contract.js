@@ -182,6 +182,30 @@ export function getSanityPnlContract(provider) {
   return new ethers.Contract(SANITY_PNL_ADDRESS, sanityPnlAbi, provider);
 }
 
+export const PROTOCOL_FEES_ADDRESS =
+  '0xE83FaC17F899c899Ef847D70a4B6eCE978CC358D';
+
+export const PROTOCOL_FEES_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'fees',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+/** Tokens tracked by the protocol fees contract */
+export const PROTOCOL_FEE_TOKEN_KEYS = ['weth', 'usdc', 'cbbtc', 'virtual'];
+
+export function getProtocolFeesContract(provider) {
+  return new ethers.Contract(
+    PROTOCOL_FEES_ADDRESS,
+    PROTOCOL_FEES_ABI,
+    provider
+  );
+}
+
 export const SLIPPAGE_STEPS_CONTRACT_ADDRESS =
   '0x3F1aa1C608544e4DE647F0aFE90e471edB239A74';
 

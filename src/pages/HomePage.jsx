@@ -8,6 +8,7 @@ import {
   getTargetBalanceContract,
   getPnLContract,
   getSanityPnlContract,
+  getProtocolFeesContract,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -17,7 +18,8 @@ import {
   PNL_ANCHOR_BLOCK,
   PNL_MAY_START_BLOCK,
   PNL_JUNE_START_BLOCK,
-  BLOCK_TIME_SECONDS
+  BLOCK_TIME_SECONDS,
+  PROTOCOL_FEE_TOKEN_KEYS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
 import '../App.css';
@@ -33,6 +35,7 @@ export function HomePage() {
   const [tokenBalances, setTokenBalances] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [sanityPnl, setSanityPnl] = useState(null);
+  const [protocolFees, setProtocolFees] = useState(null);
   const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
   const [minUSDValue, setMinUSDValue] = useState(null);
 
@@ -525,6 +528,64 @@ export function HomePage() {
         setSanityPnl(null);
       }
 
+      try {
+        const feesContract = getProtocolFeesContract(provider);
+        const sanityContract = getSanityPnlContract(provider);
+        const scale = 1e36;
+
+        const readFees = async (tokenAddress, blockTag, retries = 3) => {
+          for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+              const result = await feesContract.fees(tokenAddress, { blockTag });
+              return BigInt(result.toString());
+            } catch (error) {
+              if (attempt === retries) {
+                console.warn(
+                  `Protocol fees call reverted at block ${blockTag} after ${retries} attempts`
+                );
+                return 0n;
+              }
+              await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+            }
+          }
+          return 0n;
+        };
+
+        const juneBaselineBlock =
+          blocks.current >= PNL_JUNE_START_BLOCK ? PNL_JUNE_START_BLOCK : null;
+
+        let totalUsdRaw = 0n;
+
+        for (const tokenKey of PROTOCOL_FEE_TOKEN_KEYS) {
+          const tokenAddress = TOKENS[tokenKey];
+          const [feesCurrent, feesJuneStart] = await Promise.all([
+            readFees(tokenAddress, blocks.current),
+            juneBaselineBlock != null
+              ? readFees(tokenAddress, juneBaselineBlock)
+              : Promise.resolve(0n)
+          ]);
+
+          const feeDeltaWei = feesCurrent - feesJuneStart;
+
+          try {
+            const usdResult = await sanityContract.getUSDValue(
+              tokenAddress,
+              feeDeltaWei
+            );
+            totalUsdRaw += BigInt(usdResult.toString());
+          } catch (error) {
+            console.warn(`getUSDValue failed for ${tokenKey}:`, error);
+          }
+        }
+
+        setProtocolFees({
+          sinceJuneStart: Number(totalUsdRaw) / scale
+        });
+      } catch (e) {
+        console.warn('Protocol fees fetch failed:', e);
+        setProtocolFees(null);
+      }
+
       // Fetch volume data for all combinations
       const volumeData = {};
 
@@ -662,6 +723,7 @@ export function HomePage() {
       setIsInitialLoad(false);
     } catch (err) {
       setSanityPnl(null);
+      setProtocolFees(null);
       console.error('Error fetching volume data:', err);
       // Only show errors for critical failures (network, provider issues)
       // Contract call reverts are handled silently in readVolume
@@ -963,6 +1025,20 @@ export function HomePage() {
             {pnl.hourlySeries && pnl.hourlySeries.length > 0 && (
               <PnlHourlyChart hourlySeries={pnl.hourlySeries} />
             )}
+          </div>
+        )}
+
+        {protocolFees !== null && (
+          <div className="token-balances-card protocol-fees-card">
+            <h3 className="token-balances-title">Protocol Fees</h3>
+            <p className="protocol-fees-subtitle">Fees collected since June 1st</p>
+            <div className="protocol-fees-value">
+              $
+              {protocolFees.sinceJuneStart.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })}
+            </div>
           </div>
         )}
 
