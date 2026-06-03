@@ -21,9 +21,11 @@ import {
   BLOCK_TIME_SECONDS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
+import { useRpcToken } from '../context/RpcTokenContext';
 import '../App.css';
 
 export function HomePage() {
+  const { bearerToken } = useRpcToken();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,12 +41,14 @@ export function HomePage() {
   const [minUSDValue, setMinUSDValue] = useState(null);
 
   useEffect(() => {
+    if (!bearerToken) return;
+
     fetchVolumeData();
     
     // Refresh every 1 minute
     const interval = setInterval(fetchVolumeData, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [bearerToken]);
 
   async function fetchVolumeData() {
     try {
@@ -54,7 +58,7 @@ export function HomePage() {
       }
       setError(null);
 
-      const provider = getProvider();
+      const provider = getProvider(bearerToken);
       const contract = getContract(provider);
 
       // Get current block info

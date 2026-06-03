@@ -21,6 +21,7 @@ import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
 import whitelistSignersAbi from '../data/abis/WhitelistSigners.json';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
+import { useRpcToken } from '../context/RpcTokenContext';
 import '../App.css';
 
 const REFERENCE_ABIS_FOR_COPY = [
@@ -204,6 +205,7 @@ function formatGweiDisplay(n) {
 }
 
 export function Configuration() {
+  const { bearerToken } = useRpcToken();
   const [stepsByToken, setStepsByToken] = useState({});
   const [curveByToken, setCurveByToken] = useState({});
   const [mexicanPricer, setMexicanPricer] = useState(null);
@@ -226,13 +228,15 @@ export function Configuration() {
   // Load once per visit: no interval or polling. Re-fetch only when the user
   // navigates away and opens this page again (component remount).
   useEffect(() => {
+    if (!bearerToken) return;
+
     let cancelled = false;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const provider = getProvider();
+        const provider = getProvider(bearerToken);
         const stepsContract = getSlippageStepsContract(provider);
         const curveContract = getTargetBalanceContract(provider);
 
@@ -303,7 +307,7 @@ export function Configuration() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bearerToken]);
 
   return (
     <div className="steps-page">

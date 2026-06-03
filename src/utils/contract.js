@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { ethers, FetchRequest } from 'ethers';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
 import circuitBreakerAbi from '../data/abis/CircuitBreaker.json';
 import mexicanPricerV6Abi from '../data/abis/MexicanPricerV6.json';
@@ -9,9 +9,8 @@ export const CONTRACT_ADDRESS = '0xA05dE8fedaF5d47a6A8726811cC5f387BEf1F816';
 export const CIRCUIT_BREAKER_ADDRESS = CONTRACT_ADDRESS;
 /** Full circuit breaker ABI (copy also lives in `src/data/abis/CircuitBreaker.json`). */
 export const CIRCUIT_BREAKER_ABI = circuitBreakerAbi;
-// Base RPC endpoint - Infura
-// Uses environment variable if available, otherwise falls back to default
-export const BASE_RPC_URL = import.meta.env.VITE_INFURA_URL || 'https://base-mainnet.infura.io/v3/0ec938da607340d3bf91f8b60306f147';
+// Base RPC endpoint — 1inch archive node (requires bearer token via getProvider)
+export const BASE_RPC_URL = 'https://api.1inch.com/web3/8453/archive';
 export const FIRST_BLOCK = 42784272;
 export const BLOCK_TIME_SECONDS = 2;
 /** FIRST_BLOCK + 31 days, assuming exactly {@link BLOCK_TIME_SECONDS} seconds per block */
@@ -140,8 +139,16 @@ export const USDC_DECIMALS = 6;
 export const USDC_DIVISOR = 10n ** BigInt(USDC_DECIMALS);
 
 // Initialize provider and contract
-export function getProvider() {
-  return new ethers.JsonRpcProvider(BASE_RPC_URL);
+export function getProvider(bearerToken) {
+  if (!bearerToken) {
+    throw new Error('RPC bearer token is required');
+  }
+  const fetchRequest = new FetchRequest(BASE_RPC_URL);
+  fetchRequest.setHeader('Authorization', `Bearer ${bearerToken}`);
+  return new ethers.JsonRpcProvider(fetchRequest, {
+    chainId: 8453,
+    name: 'base'
+  });
 }
 
 export function getContract(provider) {

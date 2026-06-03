@@ -1184,6 +1184,112 @@
   }
 }
 
+.rpc-token-clear-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #ef4444;
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0.15rem 0.65rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.rpc-token-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.rpc-token-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.rpc-token-dialog {
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid rgba(100, 108, 255, 0.25);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.rpc-token-dialog h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.rpc-token-description {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rpc-token-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rpc-token-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.rpc-token-submit {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 0.4rem;
+  background: #646cff;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.rpc-token-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rpc-token-submit:not(:disabled):hover {
+  background: #535bf2;
+}
+
+@media (prefers-color-scheme: light) {
+  .rpc-token-dialog {
+    background: #fff;
+    border-color: rgba(100, 108, 255, 0.2);
+  }
+
+  .rpc-token-description {
+    color: rgba(0, 0, 0, 0.65);
+  }
+
+  .rpc-token-input {
+    border-color: rgba(0, 0, 0, 0.15);
+    background: #f8f8f8;
+  }
+}
+
 /* Steps display page */
 .steps-page {
   width: 100%;
