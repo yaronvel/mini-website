@@ -121,7 +121,9 @@ export const AGGREGATORS = {
   router0x: '0x68A14203953130ae840e37DBe3d64c1E6858da7b',
   intent0x: '0x6b6e87D2Cc438C287a5550a8732C302454E4382b',
   okx: '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8',
-  permissionless: '0xd35C6717cCa1E04696B694DCb1643Ac3620D2152'
+  nordstern: '0x28BF6006d87De7F44445905Aa4f5CB8C0D8cbA02',
+  lifiStaging: '0x1af18f06f97679b16a8f553326ab2857e6cfd920',
+  lifi: '0x09ad820aac5779683b481c4674208a4e1b024afa'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
@@ -131,7 +133,9 @@ export const AGGREGATOR_DISPLAY_NAMES = {
   router0x: 'router 0x',
   intent0x: 'intent 0x',
   okx: 'okx',
-  permissionless: 'permissionless'
+  nordstern: 'Nordstern',
+  lifiStaging: 'LiFi (staging)',
+  lifi: 'LiFi'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
