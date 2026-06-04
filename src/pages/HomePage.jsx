@@ -461,7 +461,7 @@ export function HomePage() {
           'April (lineage Δ; frozen when past May start)': pnlAprilWindow,
           May: pnlMayWindow,
           June: pnlJuneWindow,
-          'June (excluding fees)': pnlJuneExcludingFees,
+          'June (after fees)': pnlJuneExcludingFees,
           feesSinceJune,
           MAY_START_BLOCK: PNL_MAY_START_BLOCK,
           JUNE_START_BLOCK: PNL_JUNE_START_BLOCK,
@@ -869,7 +869,7 @@ export function HomePage() {
               {pnl.sinceJuneStart !== null && pnl.sinceJuneStart !== undefined && (
                 <div className="token-balance-item">
                   <div className="token-balance-header">
-                    <span className="token-balance-name">June (excluding fees)</span>
+                    <span className="token-balance-name">June (after fees)</span>
                   </div>
                   <div
                     className={`token-balance-value pnl-value pnb-circuit-cube-value ${
