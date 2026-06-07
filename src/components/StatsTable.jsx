@@ -5,6 +5,30 @@ import {
   AGGREGATOR_DISPLAY_NAMES
 } from '../utils/contract.js';
 
+function isNonZeroVolume(value) {
+  return value != null && value !== '0' && BigInt(value) !== 0n;
+}
+
+function getActiveAggregators(stats, period, aggregatorNames, tokenNames) {
+  return aggregatorNames.filter((aggName) =>
+    tokenNames.some((tokenName) =>
+      isNonZeroVolume(stats.perToken[tokenName]?.[aggName]?.[period])
+    )
+  );
+}
+
+function getActiveTokens(stats, period, aggregatorNames, tokenNames) {
+  return tokenNames.filter((tokenName) =>
+    aggregatorNames.some((aggName) =>
+      isNonZeroVolume(stats.perToken[tokenName]?.[aggName]?.[period])
+    )
+  );
+}
+
+function tokenDisplayName(tokenName) {
+  return tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
+}
+
 // Format time period for display
 function formatTimePeriod(timeSinceFirst) {
   if (!timeSinceFirst) return '24h';
@@ -38,6 +62,30 @@ export function StatsTable({ stats, loading }) {
 
   const tokenNames = Object.keys(TOKENS);
   const aggregatorNames = Object.keys(AGGREGATORS);
+  const activeAggregators1h = getActiveAggregators(
+    stats,
+    'oneHour',
+    aggregatorNames,
+    tokenNames
+  );
+  const activeTokens1h = getActiveTokens(
+    stats,
+    'oneHour',
+    aggregatorNames,
+    tokenNames
+  );
+  const activeAggregators24h = getActiveAggregators(
+    stats,
+    'twentyFourHours',
+    aggregatorNames,
+    tokenNames
+  );
+  const activeTokens24h = getActiveTokens(
+    stats,
+    'twentyFourHours',
+    aggregatorNames,
+    tokenNames
+  );
   const timePeriodLabel = formatTimePeriod(stats.timeSinceFirst);
 
   return (
@@ -56,28 +104,26 @@ export function StatsTable({ stats, loading }) {
             <thead>
               <tr>
                 <th>Token</th>
-                {aggregatorNames.map((aggName) => (
+                {activeAggregators1h.map((aggName) => (
                   <th key={aggName}>{AGGREGATOR_DISPLAY_NAMES[aggName]}</th>
                 ))}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              {tokenNames.map((tokenName) => {
+              {activeTokens1h.map((tokenName) => {
                 const tokenStats = stats.perToken[tokenName] || {};
-                const total1h = aggregatorNames
+                const total1h = activeAggregators1h
                   .reduce(
                     (sum, aggName) =>
                       sum + BigInt(tokenStats[aggName]?.oneHour || '0'),
                     0n
                   )
                   .toString();
-                const displayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
-
                 return (
                   <tr key={tokenName}>
-                    <td className="token-name">{displayName}</td>
-                    {aggregatorNames.map((aggName) => (
+                    <td className="token-name">{tokenDisplayName(tokenName)}</td>
+                    {activeAggregators1h.map((aggName) => (
                       <td key={aggName}>
                         ${formatVolume(tokenStats[aggName]?.oneHour || '0')}
                       </td>
@@ -99,27 +145,31 @@ export function StatsTable({ stats, loading }) {
             <thead>
               <tr>
                 <th>Aggregator</th>
-                <th>WETH</th>
-                <th>CBBTC</th>
-                <th>Virtual</th>
+                {activeTokens1h.map((tokenName) => (
+                  <th key={tokenName}>{tokenDisplayName(tokenName)}</th>
+                ))}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              {aggregatorNames.map((aggName) => {
+              {activeAggregators1h.map((aggName) => {
                 const aggStats = stats.perAggregator[aggName] || {};
-                const weth1h = aggStats.weth?.oneHour || '0';
-                const cbbtc1h = aggStats.cbbtc?.oneHour || '0';
-                const virtual1h = aggStats.virtual?.oneHour || '0';
-                const total1h = (BigInt(weth1h) + BigInt(cbbtc1h) + BigInt(virtual1h)).toString();
+                const total1h = activeTokens1h
+                  .reduce(
+                    (sum, tokenName) =>
+                      sum + BigInt(aggStats[tokenName]?.oneHour || '0'),
+                    0n
+                  )
+                  .toString();
 
-                const displayName = AGGREGATOR_DISPLAY_NAMES[aggName];
                 return (
                   <tr key={aggName}>
-                    <td className="aggregator-name">{displayName}</td>
-                    <td>${formatVolume(weth1h)}</td>
-                    <td>${formatVolume(cbbtc1h)}</td>
-                    <td>${formatVolume(virtual1h)}</td>
+                    <td className="aggregator-name">{AGGREGATOR_DISPLAY_NAMES[aggName]}</td>
+                    {activeTokens1h.map((tokenName) => (
+                      <td key={tokenName}>
+                        ${formatVolume(aggStats[tokenName]?.oneHour || '0')}
+                      </td>
+                    ))}
                     <td className="total-cell">${formatVolume(total1h)}</td>
                   </tr>
                 );
@@ -152,28 +202,26 @@ export function StatsTable({ stats, loading }) {
             <thead>
               <tr>
                 <th>Token</th>
-                {aggregatorNames.map((aggName) => (
+                {activeAggregators24h.map((aggName) => (
                   <th key={aggName}>{AGGREGATOR_DISPLAY_NAMES[aggName]}</th>
                 ))}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              {tokenNames.map((tokenName) => {
+              {activeTokens24h.map((tokenName) => {
                 const tokenStats = stats.perToken[tokenName] || {};
-                const total24h = aggregatorNames
+                const total24h = activeAggregators24h
                   .reduce(
                     (sum, aggName) =>
                       sum + BigInt(tokenStats[aggName]?.twentyFourHours || '0'),
                     0n
                   )
                   .toString();
-                const displayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
-
                 return (
                   <tr key={tokenName}>
-                    <td className="token-name">{displayName}</td>
-                    {aggregatorNames.map((aggName) => (
+                    <td className="token-name">{tokenDisplayName(tokenName)}</td>
+                    {activeAggregators24h.map((aggName) => (
                       <td key={aggName}>
                         ${formatVolume(tokenStats[aggName]?.twentyFourHours || '0')}
                       </td>
@@ -195,27 +243,31 @@ export function StatsTable({ stats, loading }) {
             <thead>
               <tr>
                 <th>Aggregator</th>
-                <th>WETH</th>
-                <th>CBBTC</th>
-                <th>Virtual</th>
+                {activeTokens24h.map((tokenName) => (
+                  <th key={tokenName}>{tokenDisplayName(tokenName)}</th>
+                ))}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              {aggregatorNames.map((aggName) => {
+              {activeAggregators24h.map((aggName) => {
                 const aggStats = stats.perAggregator[aggName] || {};
-                const weth24h = aggStats.weth?.twentyFourHours || '0';
-                const cbbtc24h = aggStats.cbbtc?.twentyFourHours || '0';
-                const virtual24h = aggStats.virtual?.twentyFourHours || '0';
-                const total24h = (BigInt(weth24h) + BigInt(cbbtc24h) + BigInt(virtual24h)).toString();
+                const total24h = activeTokens24h
+                  .reduce(
+                    (sum, tokenName) =>
+                      sum + BigInt(aggStats[tokenName]?.twentyFourHours || '0'),
+                    0n
+                  )
+                  .toString();
 
-                const displayName = AGGREGATOR_DISPLAY_NAMES[aggName];
                 return (
                   <tr key={aggName}>
-                    <td className="aggregator-name">{displayName}</td>
-                    <td>${formatVolume(weth24h)}</td>
-                    <td>${formatVolume(cbbtc24h)}</td>
-                    <td>${formatVolume(virtual24h)}</td>
+                    <td className="aggregator-name">{AGGREGATOR_DISPLAY_NAMES[aggName]}</td>
+                    {activeTokens24h.map((tokenName) => (
+                      <td key={tokenName}>
+                        ${formatVolume(aggStats[tokenName]?.twentyFourHours || '0')}
+                      </td>
+                    ))}
                     <td className="total-cell">${formatVolume(total24h)}</td>
                   </tr>
                 );
