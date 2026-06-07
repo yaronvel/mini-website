@@ -274,6 +274,34 @@ export async function fetchProtocolFeesSinceJune(provider, currentBlock) {
   return Number(totalUsdRaw) / PROTOCOL_FEES_USD_SCALE;
 }
 
+export const ETH_DISTRIBUTOR_ADDRESS =
+  '0x28FA46d660342e396DEDb6A8d41E835e36884570';
+
+export const ETH_DISTRIBUTOR_ABI = [
+  {
+    inputs: [],
+    name: 'totalSpent',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+export function getEthDistributorContract(provider) {
+  return new ethers.Contract(
+    ETH_DISTRIBUTOR_ADDRESS,
+    ETH_DISTRIBUTOR_ABI,
+    provider
+  );
+}
+
+/** Cumulative ETH spent by the gas distributor contract (wei → ETH). */
+export async function fetchGasExpensesTotalSpent(provider) {
+  const contract = getEthDistributorContract(provider);
+  const result = await contract.totalSpent();
+  return Number(ethers.formatUnits(BigInt(result.toString()), 18));
+}
+
 export const SLIPPAGE_STEPS_CONTRACT_ADDRESS =
   '0x3F1aa1C608544e4DE647F0aFE90e471edB239A74';
 

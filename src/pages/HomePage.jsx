@@ -9,6 +9,7 @@ import {
   getPnLContract,
   getSanityPnlContract,
   fetchProtocolFeesSinceJune,
+  fetchGasExpensesTotalSpent,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -37,6 +38,7 @@ export function HomePage() {
   const [pnl, setPnl] = useState(null);
   const [sanityPnl, setSanityPnl] = useState(null);
   const [protocolFees, setProtocolFees] = useState(null);
+  const [gasExpenses, setGasExpenses] = useState(null);
   const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
   const [minUSDValue, setMinUSDValue] = useState(null);
 
@@ -92,6 +94,14 @@ export function HomePage() {
       } catch (e) {
         console.warn('Protocol fees fetch failed:', e);
         setProtocolFees(null);
+      }
+
+      try {
+        const totalSpentEth = await fetchGasExpensesTotalSpent(provider);
+        setGasExpenses({ totalSpentEth });
+      } catch (e) {
+        console.warn('Gas expenses fetch failed:', e);
+        setGasExpenses(null);
       }
 
       // Fetch wallet value at different block heights
@@ -687,6 +697,7 @@ export function HomePage() {
     } catch (err) {
       setSanityPnl(null);
       setProtocolFees(null);
+      setGasExpenses(null);
       console.error('Error fetching volume data:', err);
       // Only show errors for critical failures (network, provider issues)
       // Contract call reverts are handled silently in readVolume
@@ -991,16 +1002,38 @@ export function HomePage() {
           </div>
         )}
 
-        {protocolFees !== null && (
+        {(protocolFees !== null || gasExpenses !== null) && (
           <div className="token-balances-card protocol-fees-card">
             <h3 className="token-balances-title">Protocol Fees</h3>
-            <p className="protocol-fees-subtitle">Fees collected since June 1st</p>
-            <div className="protocol-fees-value">
-              $
-              {protocolFees.sinceJuneStart.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              })}
+            <div className="token-balances-grid protocol-fees-grid">
+              {protocolFees !== null && (
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">Fees collected since June 1st</span>
+                  </div>
+                  <div className="protocol-fees-value">
+                    $
+                    {protocolFees.sinceJuneStart.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </div>
+                </div>
+              )}
+              {gasExpenses !== null && (
+                <div className="token-balance-item">
+                  <div className="token-balance-header">
+                    <span className="token-balance-name">Gas expenses since June 7th</span>
+                  </div>
+                  <div className="protocol-fees-value">
+                    {gasExpenses.totalSpentEth.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}{' '}
+                    ETH
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
