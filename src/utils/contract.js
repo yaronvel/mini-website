@@ -64,6 +64,13 @@ export const TARGET_BALANCE_CONTRACT_ABI = [
     ],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'badPenaltyIn1M',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ];
 

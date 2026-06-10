@@ -204,10 +204,19 @@ function formatGweiDisplay(n) {
   })} gwei`;
 }
 
+function formatBadPenaltyPercent(raw) {
+  const n = Number(toBigInt(raw)) / (1e6 / 100);
+  return `${n.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
+  })}%`;
+}
+
 export function Configuration() {
   const { bearerToken } = useRpcToken();
   const [stepsByToken, setStepsByToken] = useState({});
   const [curveByToken, setCurveByToken] = useState({});
+  const [badPenaltyPercent, setBadPenaltyPercent] = useState(null);
   const [mexicanPricer, setMexicanPricer] = useState(null);
   const [abiCopyMessage, setAbiCopyMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -281,14 +290,16 @@ export function Configuration() {
 
         const mexicanWork = loadMexicanPricerSnapshot(provider);
 
-        const [{ stepsNext, curveNext }, mexicanData] = await Promise.all([
+        const [{ stepsNext, curveNext }, badPenaltyRaw, mexicanData] = await Promise.all([
           tokenWork,
+          curveContract.badPenaltyIn1M(),
           mexicanWork
         ]);
 
         if (!cancelled) {
           setStepsByToken(stepsNext);
           setCurveByToken(curveNext);
+          setBadPenaltyPercent(formatBadPenaltyPercent(badPenaltyRaw));
           setMexicanPricer(mexicanData);
         }
       } catch (e) {
@@ -422,9 +433,19 @@ export function Configuration() {
             <br />
             <span className="config-imbalance-note">
               Cap and target use token decimals; curve <code>a</code> and <code>b</code> are shown after
-              dividing by 1e{SLIPPAGE_CURVE_RESOLUTION}.
+              dividing by 1e{SLIPPAGE_CURVE_RESOLUTION}; <code>badPenalty</code> is shown as % (on-chain ÷
+              (1e6 / 100)).
             </span>
           </p>
+
+          {badPenaltyPercent !== null && (
+            <dl className="curve-dl config-imbalance-bad-penalty">
+              <dt>badPenalty</dt>
+              <dd>
+                <code>{badPenaltyPercent}</code>
+              </dd>
+            </dl>
+          )}
 
           {CONFIGURATION_TOKEN_KEYS.map((tokenKey) => {
             const c = curveByToken[tokenKey];
