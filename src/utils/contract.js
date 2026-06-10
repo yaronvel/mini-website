@@ -124,7 +124,9 @@ export const AGGREGATORS = {
   nordstern: '0x28BF6006d87De7F44445905Aa4f5CB8C0D8cbA02',
   lifiStaging: '0x1af18f06f97679b16a8f553326ab2857e6cfd920',
   lifi: '0x09ad820aac5779683b481c4674208a4e1b024afa',
-  fibrous: '0x274602a953847d807231d2370072f5f4e4594b44'
+  fibrous: '0x274602a953847d807231d2370072f5f4e4594b44',
+  liquidMeshQA: '0xe5d4b6fa308335350e6b992c8a189eab51b22fae',
+  liquidMesh: '0xf5ae73ca5ed58a30886b88e74d0ba1931d315a8c'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
@@ -137,7 +139,9 @@ export const AGGREGATOR_DISPLAY_NAMES = {
   nordstern: 'Nordstern',
   lifiStaging: 'LiFi (staging)',
   lifi: 'LiFi',
-  fibrous: 'Fibrous'
+  fibrous: 'Fibrous',
+  liquidMeshQA: 'LiquidMesh (QA)',
+  liquidMesh: 'LiquidMesh'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
