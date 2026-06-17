@@ -11,6 +11,8 @@ export const CIRCUIT_BREAKER_ADDRESS = CONTRACT_ADDRESS;
 export const CIRCUIT_BREAKER_ABI = circuitBreakerAbi;
 // Base RPC endpoint — 1inch archive node (requires bearer token via getProvider)
 export const BASE_RPC_URL = 'https://api.1inch.com/web3/8453/archive';
+// Ethereum mainnet — same 1inch archive API, same bearer token
+export const MAINNET_RPC_URL = 'https://api.1inch.com/web3/1/archive';
 export const FIRST_BLOCK = 42784272;
 export const BLOCK_TIME_SECONDS = 2;
 /** FIRST_BLOCK + 31 days, assuming exactly {@link BLOCK_TIME_SECONDS} seconds per block */
@@ -93,6 +95,70 @@ export const TOKEN_DECIMALS = {
 // Target balance contract address
 export const TARGET_BALANCE_CONTRACT_ADDRESS = '0xe00B0150bA21625353b69d82b3ec28a9A744B0C7';
 
+export const VT_WALLET_ADDRESS = '0xbeeB9eeE061925cC6d2122F05a4e6536F0FEB000';
+export const WALLET_VALUE_VIEW_CONTRACT_ADDRESS =
+  '0x0Ca60fA2BaEe822c96f91D0a6fa8a5c11690c5cc';
+
+export const WALLET_VALUE_VIEW_CONTRACT_ABI = [
+  {
+    inputs: [
+      { internalType: 'address', name: 'walletAddress', type: 'address' },
+      { internalType: 'address[]', name: 'listedTokens', type: 'address[]' }
+    ],
+    name: 'getWalletValue',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+export const VT_WALLET_LISTED_TOKENS = [
+  TOKENS.weth,
+  TOKENS.cbbtc,
+  TOKENS.virtual
+];
+
+/** Base-chain tokens tracked in the VT wallet balances row. */
+export const VT_BALANCE_TOKENS = {
+  weth: TOKENS.weth,
+  cbbtc: TOKENS.cbbtc,
+  virtual: TOKENS.virtual
+};
+
+/** Ethereum mainnet token addresses (no cbBTC / Virtual; WBTC replaces cbBTC). */
+export const MAINNET_TOKENS = {
+  weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+  wbtc: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+  usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+};
+
+export const MAINNET_WALLET_ADDRESS = '0xC841C89609656A39d9365fd0bAB4fD8D59B99155';
+export const MAINNET_WALLET_VALUE_VIEW_CONTRACT_ADDRESS =
+  '0xC298bDDCB96B2b2074068A235F26a6F29D2E0Dea';
+export const MAINNET_CIRCUIT_BREAKER_ADDRESS =
+  '0x5CDbE59400Cc2EFDCC2B54acca4a99FE00dD588c';
+
+export const MAINNET_WALLET_LISTED_TOKENS = [
+  MAINNET_TOKENS.weth,
+  MAINNET_TOKENS.wbtc
+];
+
+export const MAINNET_TARGET_BALANCE_CONTRACT_ADDRESS =
+  '0x0e1A3f4cF05829A25D5675DC6a3497eeE50a312a';
+
+export const MAINNET_TOKEN_DECIMALS = {
+  weth: 18,
+  wbtc: 8,
+  usdc: 6
+};
+
+/** Tokens shown in the mainnet PropAMM token-balances row (WBTC replaces cbBTC). */
+export const MAINNET_BALANCE_TOKENS = {
+  weth: MAINNET_TOKENS.weth,
+  wbtc: MAINNET_TOKENS.wbtc,
+  usdc: MAINNET_TOKENS.usdc
+};
+
 // PnL contract addresses (by on-chain block when reading historical pnl())
 export const PNL_CONTRACT_ADDRESS_EARLIEST =
   '0x1b2Bfed2092532701e5C5DA69a0796989c094290';
@@ -168,12 +234,200 @@ export function getProvider(bearerToken) {
   });
 }
 
+export function getMainnetProvider(bearerToken) {
+  if (!bearerToken) {
+    throw new Error('RPC bearer token is required');
+  }
+  const fetchRequest = new FetchRequest(MAINNET_RPC_URL);
+  fetchRequest.setHeader('Authorization', `Bearer ${bearerToken}`);
+  return new ethers.JsonRpcProvider(fetchRequest, {
+    chainId: 1,
+    name: 'mainnet'
+  });
+}
+
 export function getContract(provider) {
   return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 }
 
 export function getTargetBalanceContract(provider) {
   return new ethers.Contract(TARGET_BALANCE_CONTRACT_ADDRESS, TARGET_BALANCE_CONTRACT_ABI, provider);
+}
+
+export function getWalletValueViewContract(provider) {
+  return new ethers.Contract(
+    WALLET_VALUE_VIEW_CONTRACT_ADDRESS,
+    WALLET_VALUE_VIEW_CONTRACT_ABI,
+    provider
+  );
+}
+
+/** USD value for VT wallet via CircuitBreakerViewOnly.getWalletValue (Base). */
+export async function fetchVtWalletValue(provider) {
+  const contract = getWalletValueViewContract(provider);
+  const result = await contract.getWalletValue(
+    VT_WALLET_ADDRESS,
+    VT_WALLET_LISTED_TOKENS
+  );
+  return Number(result.toString());
+}
+
+export function getMainnetWalletValueViewContract(provider) {
+  return new ethers.Contract(
+    MAINNET_WALLET_VALUE_VIEW_CONTRACT_ADDRESS,
+    WALLET_VALUE_VIEW_CONTRACT_ABI,
+    provider
+  );
+}
+
+export function getMainnetCircuitBreakerContract(provider) {
+  return new ethers.Contract(
+    MAINNET_CIRCUIT_BREAKER_ADDRESS,
+    CIRCUIT_BREAKER_ABI,
+    provider
+  );
+}
+
+export function getMainnetTargetBalanceContract(provider) {
+  return new ethers.Contract(
+    MAINNET_TARGET_BALANCE_CONTRACT_ADDRESS,
+    TARGET_BALANCE_CONTRACT_ABI,
+    provider
+  );
+}
+
+/** Balances vs targets for a wallet and token set. */
+export async function fetchTokenBalancesSnapshot(
+  provider,
+  walletAddress,
+  tokens,
+  tokenDecimals,
+  targetBalanceContract
+) {
+  const balanceData = {};
+
+  for (const [tokenName, tokenAddress] of Object.entries(tokens)) {
+    try {
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+      const [balance, targetBalance] = await Promise.all([
+        tokenContract.balanceOf(walletAddress).catch(() => 0n),
+        targetBalanceContract.tokenTargetBalance(tokenAddress).catch(() => 0n)
+      ]);
+
+      const decimals = tokenDecimals[tokenName];
+      const divisor = 10n ** BigInt(decimals);
+      const balanceBigInt =
+        typeof balance === 'bigint' ? balance : BigInt(balance.toString());
+      const targetBigInt =
+        typeof targetBalance === 'bigint'
+          ? targetBalance
+          : BigInt(targetBalance.toString());
+
+      const balanceNumber = Number(balanceBigInt) / Number(divisor);
+      const targetNumber = Number(targetBigInt) / Number(divisor);
+      const percentage = targetNumber > 0 ? (balanceNumber / targetNumber) * 100 : 0;
+
+      balanceData[tokenName] = {
+        balance: balanceNumber,
+        target: targetNumber,
+        percentage
+      };
+    } catch (error) {
+      console.error(`Error fetching balance for ${tokenName}:`, error);
+      balanceData[tokenName] = {
+        balance: 0,
+        target: 0,
+        percentage: 0
+      };
+    }
+  }
+
+  return balanceData;
+}
+
+/** Mainnet PropAMM wallet balances vs targets on Ethereum mainnet. */
+export async function fetchMainnetTokenBalances(bearerToken) {
+  const provider = getMainnetProvider(bearerToken);
+  return fetchTokenBalancesSnapshot(
+    provider,
+    MAINNET_WALLET_ADDRESS,
+    MAINNET_BALANCE_TOKENS,
+    MAINNET_TOKEN_DECIMALS,
+    getMainnetTargetBalanceContract(provider)
+  );
+}
+
+/** VT wallet on-chain balances (Base); targets are derived from PropAMM rows. */
+export async function fetchVtWalletBalances(provider) {
+  const balances = {};
+
+  for (const [tokenName, tokenAddress] of Object.entries(VT_BALANCE_TOKENS)) {
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+    const balance = await tokenContract.balanceOf(VT_WALLET_ADDRESS).catch(() => 0n);
+    const decimals = TOKEN_DECIMALS[tokenName];
+    const divisor = 10n ** BigInt(decimals);
+    const balanceBigInt =
+      typeof balance === 'bigint' ? balance : BigInt(balance.toString());
+    balances[tokenName] = Number(balanceBigInt) / Number(divisor);
+  }
+
+  return balances;
+}
+
+function tokenBalanceEntry(balance, target) {
+  return {
+    balance,
+    target,
+    percentage: target > 0 ? (balance / target) * 100 : 0
+  };
+}
+
+/** VT wallet targets from Base + Mainnet PropAMM balances and targets. */
+export function buildVtTokenBalancesSnapshot(
+  baseBalances,
+  mainnetBalances,
+  vtBalances
+) {
+  const wethTarget =
+    50 +
+    baseBalances.weth.target +
+    mainnetBalances.weth.target -
+    baseBalances.weth.balance -
+    mainnetBalances.weth.balance;
+
+  const cbbtcTarget =
+    0.5 +
+    baseBalances.cbbtc.target +
+    mainnetBalances.wbtc.target -
+    baseBalances.cbbtc.balance -
+    mainnetBalances.wbtc.balance;
+
+  const virtualTarget =
+    4744 + baseBalances.virtual.target - baseBalances.virtual.balance;
+
+  return {
+    weth: tokenBalanceEntry(vtBalances.weth, wethTarget),
+    cbbtc: tokenBalanceEntry(vtBalances.cbbtc, cbbtcTarget),
+    virtual: tokenBalanceEntry(vtBalances.virtual, virtualTarget)
+  };
+}
+
+/** Mainnet wallet USD value + circuit breaker min USD threshold. */
+export async function fetchMainnetWalletValue(bearerToken) {
+  const provider = getMainnetProvider(bearerToken);
+  const viewContract = getMainnetWalletValueViewContract(provider);
+  const circuitBreaker = getMainnetCircuitBreakerContract(provider);
+  const [valueRaw, minUsdRaw] = await Promise.all([
+    viewContract.getWalletValue(
+      MAINNET_WALLET_ADDRESS,
+      MAINNET_WALLET_LISTED_TOKENS
+    ),
+    circuitBreaker.minUSDValue()
+  ]);
+  return {
+    current: Number(valueRaw.toString()),
+    minUSDValue: Number(minUsdRaw.toString())
+  };
 }
 
 export function getPnLContract(provider, blockNumber = null) {

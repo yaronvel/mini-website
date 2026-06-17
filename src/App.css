@@ -31,6 +31,22 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+.wallet-values-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.wallet-values-grid .wallet-value-card {
+  margin-top: 0;
+}
+
+.wallet-value-card--simple .wallet-value-main,
+.wallet-value-card--vt .wallet-value-main {
+  margin-bottom: 0;
+}
+
 @media (prefers-color-scheme: light) {
   .wallet-value-card {
     background: linear-gradient(135deg, rgba(100, 108, 255, 0.05) 0%, rgba(83, 91, 242, 0.05) 100%);
@@ -242,6 +258,39 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1.5rem;
+}
+
+.token-balances-grid--aligned {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.token-balances-grid--aligned .token-balance-item {
+  min-height: 9.5rem;
+}
+
+.token-balance-item--hole {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.token-balances-row + .token-balances-row {
+  margin-top: 1.75rem;
+}
+
+.token-balances-row-title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (prefers-color-scheme: light) {
+  .token-balances-row-title {
+    color: rgba(0, 0, 0, 0.85);
+  }
 }
 
 .token-balance-item {
@@ -887,6 +936,15 @@
   .pnl-card {
     padding: 1rem;
     margin-top: 1.5rem;
+  }
+
+  .wallet-values-grid {
+    grid-template-columns: 1fr;
+    margin-top: 1.5rem;
+  }
+
+  .wallet-values-grid .wallet-value-card {
+    margin-top: 0;
   }
 
   .wallet-value-main {

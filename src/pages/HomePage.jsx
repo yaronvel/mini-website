@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
 import { StatsTable } from '../components/StatsTable';
 import { PnlHourlyChart } from '../components/PnlHourlyChart';
 import { 
@@ -10,11 +9,16 @@ import {
   getSanityPnlContract,
   fetchProtocolFeesSinceJune,
   fetchGasExpensesTotalSpent,
+  fetchVtWalletValue,
+  fetchMainnetWalletValue,
+  fetchTokenBalancesSnapshot,
+  fetchMainnetTokenBalances,
+  fetchVtWalletBalances,
+  buildVtTokenBalancesSnapshot,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
   USDC_DIVISOR,
-  ERC20_ABI,
   FIRST_BLOCK,
   PNL_ANCHOR_BLOCK,
   PNL_MAY_START_BLOCK,
@@ -24,6 +28,121 @@ import {
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
 import { useRpcToken } from '../context/RpcTokenContext';
 import '../App.css';
+
+function tokenBalanceDisplayName(tokenName) {
+  if (tokenName === 'virtual') return 'Virtual';
+  if (tokenName === 'cbbtc') return 'CBBTC';
+  if (tokenName === 'wbtc') return 'WBTC';
+  return tokenName.toUpperCase();
+}
+
+function progressBarColor(percentage) {
+  const p = percentage;
+  if (p < 50) return '#ef4444';
+  if (p < 100) return '#f59e0b';
+  if (p >= 200) return '#064e3b';
+  const t = (p - 100) / 100;
+  const start = { r: 34, g: 197, b: 94 };
+  const end = { r: 6, g: 78, b: 59 };
+  const r = Math.round(start.r + (end.r - start.r) * t);
+  const g = Math.round(start.g + (end.g - start.g) * t);
+  const b = Math.round(start.b + (end.b - start.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function renderTokenBalanceCube(tokenName, data) {
+  return (
+    <div key={tokenName} className="token-balance-item">
+      <div className="token-balance-header">
+        <span className="token-balance-name">{tokenBalanceDisplayName(tokenName)}</span>
+        <span className="token-balance-percentage">{data.percentage.toFixed(2)}%</span>
+      </div>
+      <div className="token-balance-details">
+        <div className="token-balance-row">
+          <span className="token-balance-label">Balance:</span>
+          <span className="token-balance-value">
+            {data.balance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+        <div className="token-balance-row">
+          <span className="token-balance-label">Target:</span>
+          <span className="token-balance-value">
+            {data.target.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+      </div>
+      <div className="token-balance-progress-bar">
+        <div
+          className="token-balance-progress-fill"
+          style={{
+            width: `${Math.min(data.percentage, 100)}%`,
+            backgroundColor: progressBarColor(data.percentage)
+          }}
+        ></div>
+      </div>
+    </div>
+  );
+}
+
+const BASE_BALANCE_SLOT_KEYS = ['weth', 'cbbtc', 'virtual', 'usdc'];
+
+/** Mainnet cubes align under Base columns: weth, cbbtc→wbtc, virtual hole, usdc. */
+const MAINNET_BALANCE_SLOTS = [
+  { column: 'weth', tokenKey: 'weth' },
+  { column: 'cbbtc', tokenKey: 'wbtc' },
+  { column: 'virtual', tokenKey: null },
+  { column: 'usdc', tokenKey: 'usdc' }
+];
+
+/** VT row: weth, cbbtc, virtual aligned; USDC column empty. */
+const VT_BALANCE_SLOTS = [
+  { column: 'weth', tokenKey: 'weth' },
+  { column: 'cbbtc', tokenKey: 'cbbtc' },
+  { column: 'virtual', tokenKey: 'virtual' },
+  { column: 'usdc', tokenKey: null }
+];
+
+function renderBaseBalanceRow(balanceData) {
+  return BASE_BALANCE_SLOT_KEYS.map((tokenKey) =>
+    renderTokenBalanceCube(tokenKey, balanceData[tokenKey])
+  );
+}
+
+function renderMainnetBalanceRow(balanceData) {
+  return MAINNET_BALANCE_SLOTS.map(({ column, tokenKey }) => {
+    if (tokenKey === null) {
+      return (
+        <div
+          key={column}
+          className="token-balance-item token-balance-item--hole"
+          aria-hidden="true"
+        />
+      );
+    }
+    return renderTokenBalanceCube(tokenKey, balanceData[tokenKey]);
+  });
+}
+
+function renderVtBalanceRow(balanceData) {
+  return VT_BALANCE_SLOTS.map(({ column, tokenKey }) => {
+    if (tokenKey === null) {
+      return (
+        <div
+          key={column}
+          className="token-balance-item token-balance-item--hole"
+          aria-hidden="true"
+        />
+      );
+    }
+    return renderTokenBalanceCube(tokenKey, balanceData[tokenKey]);
+  });
+}
 
 export function HomePage() {
   const { bearerToken } = useRpcToken();
@@ -35,6 +154,11 @@ export function HomePage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [walletValue, setWalletValue] = useState(null);
   const [tokenBalances, setTokenBalances] = useState(null);
+  const [mainnetTokenBalances, setMainnetTokenBalances] = useState(null);
+  const [vtTokenBalances, setVtTokenBalances] = useState(null);
+  const [vtWalletValue, setVtWalletValue] = useState(null);
+  const [mainnetWalletValue, setMainnetWalletValue] = useState(null);
+  const [mainnetMinUSDValue, setMainnetMinUSDValue] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [sanityPnl, setSanityPnl] = useState(null);
   const [protocolFees, setProtocolFees] = useState(null);
@@ -172,57 +296,60 @@ export function HomePage() {
       // Get target balance contract
       const targetBalanceContract = getTargetBalanceContract(provider);
       
-      // Fetch token balances and target balances
-      const balanceData = {};
-      
-      for (const [tokenName, tokenAddress] of Object.entries(TOKENS)) {
-        try {
-          // Get token contract
-          const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-          
-          // Get balance and target balance in parallel
-          const [balance, targetBalance] = await Promise.all([
-            tokenContract.balanceOf(walletAddress).catch((e) => {
-              console.warn(`Error getting balance for ${tokenName}:`, e);
-              return 0n;
-            }),
-            targetBalanceContract.tokenTargetBalance(tokenAddress).catch((e) => {
-              console.warn(`Error getting target balance for ${tokenName}:`, e);
-              return 0n;
-            })
-          ]);
-          
-          const decimals = TOKEN_DECIMALS[tokenName];
-          const divisor = 10n ** BigInt(decimals);
-          
-          // Convert BigInt to number properly
-          const balanceBigInt = typeof balance === 'bigint' ? balance : BigInt(balance.toString());
-          const targetBigInt = typeof targetBalance === 'bigint' ? targetBalance : BigInt(targetBalance.toString());
-          
-          const balanceNumber = Number(balanceBigInt) / Number(divisor);
-          const targetNumber = Number(targetBigInt) / Number(divisor);
-          const percentage = targetNumber > 0 ? (balanceNumber / targetNumber) * 100 : 0;
-          
-          console.log(`${tokenName} balance:`, balanceNumber, 'target:', targetNumber, 'percentage:', percentage);
-          
-          balanceData[tokenName] = {
-            balance: balanceNumber,
-            target: targetNumber,
-            percentage: percentage,
-            balanceRaw: balanceBigInt.toString(),
-            targetRaw: targetBigInt.toString()
-          };
-        } catch (error) {
-          console.error(`Error fetching balance for ${tokenName}:`, error);
-          balanceData[tokenName] = {
-            balance: 0,
-            target: 0,
-            percentage: 0
-          };
-        }
-      }
-      
+      // Fetch token balances and target balances (Base PropAMM)
+      const balanceData = await fetchTokenBalancesSnapshot(
+        provider,
+        walletAddress,
+        TOKENS,
+        TOKEN_DECIMALS,
+        targetBalanceContract
+      );
       setTokenBalances(balanceData);
+
+      let mainnetBalancesData = null;
+      try {
+        mainnetBalancesData = await fetchMainnetTokenBalances(bearerToken);
+        setMainnetTokenBalances(mainnetBalancesData);
+      } catch (e) {
+        console.warn('Mainnet token balances fetch failed:', e);
+        setMainnetTokenBalances(null);
+      }
+
+      try {
+        if (mainnetBalancesData) {
+          const vtBalances = await fetchVtWalletBalances(provider);
+          setVtTokenBalances(
+            buildVtTokenBalancesSnapshot(
+              balanceData,
+              mainnetBalancesData,
+              vtBalances
+            )
+          );
+        } else {
+          setVtTokenBalances(null);
+        }
+      } catch (e) {
+        console.warn('VT wallet token balances fetch failed:', e);
+        setVtTokenBalances(null);
+      }
+
+      try {
+        const vtValue = await fetchVtWalletValue(provider);
+        setVtWalletValue(vtValue);
+      } catch (e) {
+        console.warn('VT wallet value fetch failed:', e);
+        setVtWalletValue(null);
+      }
+
+      try {
+        const mainnetSnapshot = await fetchMainnetWalletValue(bearerToken);
+        setMainnetWalletValue(mainnetSnapshot.current);
+        setMainnetMinUSDValue(mainnetSnapshot.minUSDValue);
+      } catch (e) {
+        console.warn('Mainnet wallet value fetch failed:', e);
+        setMainnetWalletValue(null);
+        setMainnetMinUSDValue(null);
+      }
 
       // First block timestamp (local so PnL labels can use it in the same fetch)
       let firstBlockTsResolved = firstBlockTimestamp;
@@ -727,133 +854,150 @@ export function HomePage() {
         </div>
         
         {/* Wallet Value Display */}
-        {walletValue && (
-          <div className="wallet-value-card">
-            <div className="wallet-value-main">
-              <div className="wallet-value-main-left">
-                <span className="wallet-value-label">Wallet Value</span>
-                <span className="wallet-value-amount">
-                  ${walletValue.current.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-            {minUSDValue !== null && minUSDValue !== undefined && (
-              <div className="wallet-value-minusd-block">
-                <div className="wallet-value-minusd-text">
-                  <span className="wallet-value-minusd-label">Circuit Breaker Min USD Value</span>
-                  <span className="wallet-value-minusd-amount">
-                    ${minUSDValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
+        {(walletValue || vtWalletValue !== null || mainnetWalletValue !== null) && (
+          <div className="wallet-values-grid">
+            {walletValue && (
+              <div className="wallet-value-card">
+                <div className="wallet-value-main">
+                  <div className="wallet-value-main-left">
+                    <span className="wallet-value-label">PropAMM wallet value</span>
+                    <span className="wallet-value-amount">
+                      ${walletValue.current.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-                {walletValue.current > 0 && (
-                  <div className="wallet-value-minusd-bar">
-                    <div
-                      className="wallet-value-minusd-bar-fill"
-                      style={{
-                        width: `${Math.min((minUSDValue / walletValue.current) * 100, 100)}%`
-                      }}
-                    ></div>
+                {minUSDValue !== null && minUSDValue !== undefined && (
+                  <div className="wallet-value-minusd-block">
+                    <div className="wallet-value-minusd-text">
+                      <span className="wallet-value-minusd-label">Circuit Breaker Min USD Value</span>
+                      <span className="wallet-value-minusd-amount">
+                        ${minUSDValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    {walletValue.current > 0 && (
+                      <div className="wallet-value-minusd-bar">
+                        <div
+                          className="wallet-value-minusd-bar-fill"
+                          style={{
+                            width: `${Math.min((minUSDValue / walletValue.current) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="wallet-value-changes">
+                  {walletValue.change1h !== null && walletValue.change1h !== undefined && (
+                    <div className={`wallet-change ${walletValue.change1h >= 0 ? 'positive' : 'negative'}`}>
+                      <span className="change-label">1h:</span>
+                      <span className="change-value">
+                        {walletValue.change1h >= 0 ? '+' : ''}{walletValue.change1h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <span className="change-percent">
+                        ({walletValue.change1h >= 0 ? '+' : ''}{((walletValue.change1h / walletValue.current) * 100).toFixed(2)}%)
+                      </span>
+                    </div>
+                  )}
+                  {walletValue.change24h !== null && walletValue.change24h !== undefined && (
+                    <div className={`wallet-change ${walletValue.change24h >= 0 ? 'positive' : 'negative'}`}>
+                      <span className="change-label">24h:</span>
+                      <span className="change-value">
+                        {walletValue.change24h >= 0 ? '+' : ''}{walletValue.change24h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <span className="change-percent">
+                        ({walletValue.change24h >= 0 ? '+' : ''}{((walletValue.change24h / walletValue.current) * 100).toFixed(2)}%)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {vtWalletValue !== null && (
+              <div className="wallet-value-card wallet-value-card--simple">
+                <div className="wallet-value-main">
+                  <div className="wallet-value-main-left">
+                    <span className="wallet-value-label">VT wallet</span>
+                    <span className="wallet-value-amount">
+                      ${vtWalletValue.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {mainnetWalletValue !== null && (
+              <div className="wallet-value-card">
+                <div className="wallet-value-main">
+                  <div className="wallet-value-main-left">
+                    <span className="wallet-value-label">Mainnet Wallet</span>
+                    <span className="wallet-value-amount">
+                      ${mainnetWalletValue.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </span>
+                  </div>
+                </div>
+                {mainnetMinUSDValue !== null && mainnetMinUSDValue !== undefined && (
+                  <div className="wallet-value-minusd-block">
+                    <div className="wallet-value-minusd-text">
+                      <span className="wallet-value-minusd-label">Circuit Breaker Min USD Value</span>
+                      <span className="wallet-value-minusd-amount">
+                        ${mainnetMinUSDValue.toLocaleString('en-US', {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        })}
+                      </span>
+                    </div>
+                    {mainnetWalletValue > 0 && (
+                      <div className="wallet-value-minusd-bar">
+                        <div
+                          className="wallet-value-minusd-bar-fill"
+                          style={{
+                            width: `${Math.min((mainnetMinUSDValue / mainnetWalletValue) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
-            <div className="wallet-value-changes">
-              {walletValue.change1h !== null && walletValue.change1h !== undefined && (
-                <div className={`wallet-change ${walletValue.change1h >= 0 ? 'positive' : 'negative'}`}>
-                  <span className="change-label">1h:</span>
-                  <span className="change-value">
-                    {walletValue.change1h >= 0 ? '+' : ''}{walletValue.change1h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className="change-percent">
-                    ({walletValue.change1h >= 0 ? '+' : ''}{((walletValue.change1h / walletValue.current) * 100).toFixed(2)}%)
-                  </span>
-                </div>
-              )}
-              {walletValue.change24h !== null && walletValue.change24h !== undefined && (
-                <div className={`wallet-change ${walletValue.change24h >= 0 ? 'positive' : 'negative'}`}>
-                  <span className="change-label">24h:</span>
-                  <span className="change-value">
-                    {walletValue.change24h >= 0 ? '+' : ''}{walletValue.change24h.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className="change-percent">
-                    ({walletValue.change24h >= 0 ? '+' : ''}{((walletValue.change24h / walletValue.current) * 100).toFixed(2)}%)
-                  </span>
-                </div>
-              )}
-            </div>
           </div>
         )}
         
         {/* Token Balances Display */}
-        {tokenBalances && (
+        {(tokenBalances || mainnetTokenBalances || vtTokenBalances) && (
           <div className="token-balances-card">
             <h3 className="token-balances-title">Token Balances</h3>
-            <div className="token-balances-grid">
-              {Object.entries(tokenBalances).map(([tokenName, data]) => {
-                const tokenDisplayName = tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
-                return (
-                  <div key={tokenName} className="token-balance-item">
-                    <div className="token-balance-header">
-                      <span className="token-balance-name">{tokenDisplayName}</span>
-                      <span className="token-balance-percentage">
-                        {data.percentage.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="token-balance-details">
-                      <div className="token-balance-row">
-                        <span className="token-balance-label">Balance:</span>
-                        <span className="token-balance-value">
-                          {data.balance.toLocaleString('en-US', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 6 
-                          })}
-                        </span>
-                      </div>
-                      <div className="token-balance-row">
-                        <span className="token-balance-label">Target:</span>
-                        <span className="token-balance-value">
-                          {data.target.toLocaleString('en-US', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 6 
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="token-balance-progress-bar">
-                      <div 
-                        className="token-balance-progress-fill"
-                        style={{ 
-                          width: `${Math.min(data.percentage, 100)}%`,
-                          // Color logic:
-                          // - < 50%: red
-                          // - 50–100%: yellow
-                          // - 100–200%: green that gets darker as percentage increases
-                          // - >= 200%: very dark green
-                          backgroundColor: (() => {
-                            const p = data.percentage;
-                            if (p < 50) return '#ef4444'; // red
-                            if (p < 100) return '#f59e0b'; // yellow
-                            if (p >= 200) return '#064e3b'; // very dark green
-                            // Between 100% and 200%: interpolate light -> dark green
-                            const t = (p - 100) / 100; // 0 to 1
-                            const start = { r: 34, g: 197, b: 94 };  // #22c55e
-                            const end   = { r: 6,  g: 78,  b: 59 };  // #064e3b
-                            const r = Math.round(start.r + (end.r - start.r) * t);
-                            const g = Math.round(start.g + (end.g - start.g) * t);
-                            const b = Math.round(start.b + (end.b - start.b) * t);
-                            return `rgb(${r}, ${g}, ${b})`;
-                          })()
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {tokenBalances && (
+              <section className="token-balances-row">
+                <h4 className="token-balances-row-title">Base PropAMM</h4>
+                <div className="token-balances-grid token-balances-grid--aligned">
+                  {renderBaseBalanceRow(tokenBalances)}
+                </div>
+              </section>
+            )}
+            {mainnetTokenBalances && (
+              <section className="token-balances-row">
+                <h4 className="token-balances-row-title">Mainnet PropAMM</h4>
+                <div className="token-balances-grid token-balances-grid--aligned">
+                  {renderMainnetBalanceRow(mainnetTokenBalances)}
+                </div>
+              </section>
+            )}
+            {vtTokenBalances && (
+              <section className="token-balances-row">
+                <h4 className="token-balances-row-title">VT wallet</h4>
+                <div className="token-balances-grid token-balances-grid--aligned">
+                  {renderVtBalanceRow(vtTokenBalances)}
+                </div>
+              </section>
+            )}
           </div>
         )}
-        
-        {/* PnL Display */}
         {pnl !== null && (
           <div className="pnl-card">
             <h3 className="pnl-title">PnL Statistics</h3>
