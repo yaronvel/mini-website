@@ -132,6 +132,55 @@ function renderMainnetBalanceRow(balanceData) {
   });
 }
 
+function renderVtTokenBalanceCube(tokenName, data) {
+  return (
+    <div key={tokenName} className="token-balance-item">
+      <div className="token-balance-header">
+        <span className="token-balance-name">{tokenBalanceDisplayName(tokenName)}</span>
+        <span className="token-balance-percentage">{data.percentage.toFixed(2)}%</span>
+      </div>
+      <div className="token-balance-details">
+        <div className="token-balance-row">
+          <span className="token-balance-label">Balance:</span>
+          <span className="token-balance-value">
+            {data.balance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+        <div className="token-balance-row">
+          <span className="token-balance-label">Desired Balance:</span>
+          <span className="token-balance-value">
+            {data.desiredBalance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+        <div className="token-balance-row">
+          <span className="token-balance-label">Target:</span>
+          <span className="token-balance-value">
+            {data.fixedTarget.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+      </div>
+      <div className="token-balance-progress-bar">
+        <div
+          className="token-balance-progress-fill"
+          style={{
+            width: `${Math.min(data.percentage, 100)}%`,
+            backgroundColor: progressBarColor(data.percentage)
+          }}
+        ></div>
+      </div>
+    </div>
+  );
+}
+
 function renderVtBalanceRow(balanceData) {
   return VT_BALANCE_SLOTS.map(({ column, tokenKey }) => {
     if (tokenKey === null) {
@@ -143,7 +192,7 @@ function renderVtBalanceRow(balanceData) {
         />
       );
     }
-    return renderTokenBalanceCube(tokenKey, balanceData[tokenKey]);
+    return renderVtTokenBalanceCube(tokenKey, balanceData[tokenKey]);
   });
 }
 

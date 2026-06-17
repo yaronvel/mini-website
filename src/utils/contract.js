@@ -384,6 +384,23 @@ function tokenBalanceEntry(balance, target) {
   };
 }
 
+export const VT_FIXED_TARGETS = {
+  weth: 50,
+  cbbtc: 1.1,
+  virtual: 4744,
+  usdc: 0
+};
+
+function vtTokenBalanceEntry(balance, desiredBalance, fixedTarget) {
+  return {
+    balance,
+    desiredBalance,
+    fixedTarget,
+    target: desiredBalance,
+    percentage: desiredBalance > 0 ? (balance / desiredBalance) * 100 : 0
+  };
+}
+
 /** VT wallet targets from Base + Mainnet PropAMM balances and targets. */
 export function buildVtTokenBalancesSnapshot(
   baseBalances,
@@ -399,7 +416,7 @@ export function buildVtTokenBalancesSnapshot(
     mainnetBalances.weth.balance;
 
   const cbbtcTarget =
-    0.5 +
+    1.1 +
     baseBalances.cbbtc.target +
     mainnetBalances.wbtc.target -
     baseBalances.cbbtc.balance -
@@ -409,10 +426,14 @@ export function buildVtTokenBalancesSnapshot(
     4744 + baseBalances.virtual.target - baseBalances.virtual.balance;
 
   return {
-    weth: tokenBalanceEntry(vtBalances.weth, wethTarget),
-    cbbtc: tokenBalanceEntry(vtBalances.cbbtc, cbbtcTarget),
-    virtual: tokenBalanceEntry(vtBalances.virtual, virtualTarget),
-    usdc: tokenBalanceEntry(vtUsdcBalance, 0)
+    weth: vtTokenBalanceEntry(vtBalances.weth, wethTarget, VT_FIXED_TARGETS.weth),
+    cbbtc: vtTokenBalanceEntry(vtBalances.cbbtc, cbbtcTarget, VT_FIXED_TARGETS.cbbtc),
+    virtual: vtTokenBalanceEntry(
+      vtBalances.virtual,
+      virtualTarget,
+      VT_FIXED_TARGETS.virtual
+    ),
+    usdc: vtTokenBalanceEntry(vtUsdcBalance, 0, VT_FIXED_TARGETS.usdc)
   };
 }
 
@@ -443,10 +464,10 @@ export function buildGlobalTokenBalancesSnapshot(
     mainnetBalances.wbtc.balance +
     vtBalances.cbbtc.balance;
   const btcTarget =
-    0.5 + baseBalances.cbbtc.target + mainnetBalances.wbtc.target;
+    1.1 + baseBalances.cbbtc.target + mainnetBalances.wbtc.target;
 
   const virtualBalance = baseBalances.virtual.balance + vtBalances.virtual.balance;
-  const virtualTarget = baseBalances.virtual.target + 4777;
+  const virtualTarget = baseBalances.virtual.target + 4744;
 
   const usdcBalance =
     baseBalances.usdc.balance + mainnetBalances.usdc.balance + vtBalances.usdc.balance;
