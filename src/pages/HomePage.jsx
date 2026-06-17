@@ -15,6 +15,8 @@ import {
   fetchMainnetTokenBalances,
   fetchVtWalletBalances,
   buildVtTokenBalancesSnapshot,
+  fetchVtWalletUsdcBalance,
+  buildGlobalTokenBalancesSnapshot,
   TOKENS, 
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -50,11 +52,12 @@ function progressBarColor(percentage) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function renderTokenBalanceCube(tokenName, data) {
+function renderTokenBalanceCube(tokenName, data, displayNameOverride) {
+  const displayName = displayNameOverride ?? tokenBalanceDisplayName(tokenName);
   return (
     <div key={tokenName} className="token-balance-item">
       <div className="token-balance-header">
-        <span className="token-balance-name">{tokenBalanceDisplayName(tokenName)}</span>
+        <span className="token-balance-name">{displayName}</span>
         <span className="token-balance-percentage">{data.percentage.toFixed(2)}%</span>
       </div>
       <div className="token-balance-details">
@@ -100,12 +103,12 @@ const MAINNET_BALANCE_SLOTS = [
   { column: 'usdc', tokenKey: 'usdc' }
 ];
 
-/** VT row: weth, cbbtc, virtual aligned; USDC column empty. */
+/** VT row: weth, cbbtc, virtual, usdc aligned with Base columns. */
 const VT_BALANCE_SLOTS = [
   { column: 'weth', tokenKey: 'weth' },
   { column: 'cbbtc', tokenKey: 'cbbtc' },
   { column: 'virtual', tokenKey: 'virtual' },
-  { column: 'usdc', tokenKey: null }
+  { column: 'usdc', tokenKey: 'usdc' }
 ];
 
 function renderBaseBalanceRow(balanceData) {
@@ -144,6 +147,16 @@ function renderVtBalanceRow(balanceData) {
   });
 }
 
+function renderGlobalBalanceRow(balanceData) {
+  return BASE_BALANCE_SLOT_KEYS.map((tokenKey) =>
+    renderTokenBalanceCube(
+      tokenKey,
+      balanceData[tokenKey],
+      tokenKey === 'cbbtc' ? 'BTC' : undefined
+    )
+  );
+}
+
 export function HomePage() {
   const { bearerToken } = useRpcToken();
   const [stats, setStats] = useState(null);
@@ -156,6 +169,7 @@ export function HomePage() {
   const [tokenBalances, setTokenBalances] = useState(null);
   const [mainnetTokenBalances, setMainnetTokenBalances] = useState(null);
   const [vtTokenBalances, setVtTokenBalances] = useState(null);
+  const [globalTokenBalances, setGlobalTokenBalances] = useState(null);
   const [vtWalletValue, setVtWalletValue] = useState(null);
   const [mainnetWalletValue, setMainnetWalletValue] = useState(null);
   const [mainnetMinUSDValue, setMainnetMinUSDValue] = useState(null);
@@ -318,19 +332,29 @@ export function HomePage() {
       try {
         if (mainnetBalancesData) {
           const vtBalances = await fetchVtWalletBalances(provider);
-          setVtTokenBalances(
-            buildVtTokenBalancesSnapshot(
+          const vtUsdcBalance = await fetchVtWalletUsdcBalance(provider);
+          const vtSnapshot = buildVtTokenBalancesSnapshot(
+            balanceData,
+            mainnetBalancesData,
+            vtBalances,
+            vtUsdcBalance
+          );
+          setVtTokenBalances(vtSnapshot);
+          setGlobalTokenBalances(
+            buildGlobalTokenBalancesSnapshot(
               balanceData,
               mainnetBalancesData,
-              vtBalances
+              vtSnapshot
             )
           );
         } else {
           setVtTokenBalances(null);
+          setGlobalTokenBalances(null);
         }
       } catch (e) {
         console.warn('VT wallet token balances fetch failed:', e);
         setVtTokenBalances(null);
+        setGlobalTokenBalances(null);
       }
 
       try {
@@ -969,7 +993,7 @@ export function HomePage() {
         )}
         
         {/* Token Balances Display */}
-        {(tokenBalances || mainnetTokenBalances || vtTokenBalances) && (
+        {(tokenBalances || mainnetTokenBalances || vtTokenBalances || globalTokenBalances) && (
           <div className="token-balances-card">
             <h3 className="token-balances-title">Token Balances</h3>
             {tokenBalances && (
@@ -993,6 +1017,14 @@ export function HomePage() {
                 <h4 className="token-balances-row-title">VT wallet</h4>
                 <div className="token-balances-grid token-balances-grid--aligned">
                   {renderVtBalanceRow(vtTokenBalances)}
+                </div>
+              </section>
+            )}
+            {globalTokenBalances && (
+              <section className="token-balances-row">
+                <h4 className="token-balances-row-title">Global</h4>
+                <div className="token-balances-grid token-balances-grid--aligned">
+                  {renderGlobalBalanceRow(globalTokenBalances)}
                 </div>
               </section>
             )}

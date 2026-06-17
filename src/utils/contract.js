@@ -386,7 +386,8 @@ function tokenBalanceEntry(balance, target) {
 export function buildVtTokenBalancesSnapshot(
   baseBalances,
   mainnetBalances,
-  vtBalances
+  vtBalances,
+  vtUsdcBalance
 ) {
   const wethTarget =
     50 +
@@ -408,7 +409,51 @@ export function buildVtTokenBalancesSnapshot(
   return {
     weth: tokenBalanceEntry(vtBalances.weth, wethTarget),
     cbbtc: tokenBalanceEntry(vtBalances.cbbtc, cbbtcTarget),
-    virtual: tokenBalanceEntry(vtBalances.virtual, virtualTarget)
+    virtual: tokenBalanceEntry(vtBalances.virtual, virtualTarget),
+    usdc: tokenBalanceEntry(vtUsdcBalance, 0)
+  };
+}
+
+/** VT wallet USDC balance on Base (included in Global row; target fixed at 0). */
+export async function fetchVtWalletUsdcBalance(provider) {
+  const tokenContract = new ethers.Contract(TOKENS.usdc, ERC20_ABI, provider);
+  const balance = await tokenContract.balanceOf(VT_WALLET_ADDRESS).catch(() => 0n);
+  const balanceBigInt =
+    typeof balance === 'bigint' ? balance : BigInt(balance.toString());
+  return Number(balanceBigInt) / Number(USDC_DIVISOR);
+}
+
+/** Global row: summed balances; targets from Base + Mainnet constants (excludes VT). */
+export function buildGlobalTokenBalancesSnapshot(
+  baseBalances,
+  mainnetBalances,
+  vtBalances
+) {
+  const wethBalance =
+    baseBalances.weth.balance +
+    mainnetBalances.weth.balance +
+    vtBalances.weth.balance;
+  const wethTarget =
+    baseBalances.weth.target + mainnetBalances.weth.target + 50;
+
+  const btcBalance =
+    baseBalances.cbbtc.balance +
+    mainnetBalances.wbtc.balance +
+    vtBalances.cbbtc.balance;
+  const btcTarget =
+    0.5 + baseBalances.cbbtc.target + mainnetBalances.wbtc.target;
+
+  const virtualBalance = baseBalances.virtual.balance + vtBalances.virtual.balance;
+  const virtualTarget = baseBalances.virtual.target + 4777;
+
+  const usdcBalance =
+    baseBalances.usdc.balance + mainnetBalances.usdc.balance + vtBalances.usdc.balance;
+
+  return {
+    weth: tokenBalanceEntry(wethBalance, wethTarget),
+    cbbtc: tokenBalanceEntry(btcBalance, btcTarget),
+    virtual: tokenBalanceEntry(virtualBalance, virtualTarget),
+    usdc: tokenBalanceEntry(usdcBalance, 0)
   };
 }
 
