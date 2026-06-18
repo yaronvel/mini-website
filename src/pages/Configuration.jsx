@@ -52,6 +52,7 @@ const ZEROX_NORMAL_AGGREGATOR_ADDRESS =
   '0x7747F8D2a76BD6345Cc29622a946A929647F2359';
 const OKX_AGGREGATOR_ADDRESS =
   '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8';
+const OKX_SIGNER_ADDRESS = '0xBeEEE605DC6a531AeB4bc3C809Cf6Dd86674F001';
 
 const XBASE_DECIMALS = {
   weth: 18,
@@ -569,6 +570,10 @@ export function Configuration() {
             <dt>okx</dt>
             <dd>
               <code>{OKX_AGGREGATOR_ADDRESS}</code>
+            </dd>
+            <dt>OKX signer</dt>
+            <dd>
+              <code>{OKX_SIGNER_ADDRESS}</code>
             </dd>
             <dt>WhitelistSigners</dt>
             <dd>
