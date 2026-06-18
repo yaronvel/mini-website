@@ -163,15 +163,17 @@ function renderVtTokenBalanceCube(tokenName, data, hideVtTargetPercentage) {
             })}
           </span>
         </div>
-        <div className="token-balance-row">
-          <span className="token-balance-label">Desired Balance:</span>
-          <span className="token-balance-value">
-            {data.desiredBalance.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 6
-            })}
-          </span>
-        </div>
+        {!hideVtTargetPercentage && (
+          <div className="token-balance-row">
+            <span className="token-balance-label">Desired Balance:</span>
+            <span className="token-balance-value">
+              {data.desiredBalance.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
+              })}
+            </span>
+          </div>
+        )}
       </div>
       {hideVtTargetPercentage ? null : (
         <div className="token-balance-progress-bar">
