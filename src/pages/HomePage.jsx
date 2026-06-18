@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { StatsTable } from '../components/StatsTable';
 import { PnlHourlyChart } from '../components/PnlHourlyChart';
+import { isUbuntuOrXiaomiMobile } from '../utils/clientPlatform';
 import { 
   getProvider, 
   getContract, 
@@ -132,12 +133,16 @@ function renderMainnetBalanceRow(balanceData) {
   });
 }
 
-function renderVtTokenBalanceCube(tokenName, data) {
+function renderVtTokenBalanceCube(tokenName, data, hideVtTargetPercentage) {
   return (
     <div key={tokenName} className="token-balance-item">
       <div className="token-balance-header">
         <span className="token-balance-name">{tokenBalanceDisplayName(tokenName)}</span>
-        <span className="token-balance-percentage">{data.percentage.toFixed(2)}%</span>
+        {hideVtTargetPercentage ? (
+          <span className="token-balance-ubuntu-only-note">for ubuntu users only</span>
+        ) : (
+          <span className="token-balance-percentage">{data.percentage.toFixed(2)}%</span>
+        )}
       </div>
       <div className="token-balance-details">
         <div className="token-balance-row">
@@ -168,20 +173,22 @@ function renderVtTokenBalanceCube(tokenName, data) {
           </span>
         </div>
       </div>
-      <div className="token-balance-progress-bar">
-        <div
-          className="token-balance-progress-fill"
-          style={{
-            width: `${Math.min(data.percentage, 100)}%`,
-            backgroundColor: progressBarColor(data.percentage)
-          }}
-        ></div>
-      </div>
+      {hideVtTargetPercentage ? null : (
+        <div className="token-balance-progress-bar">
+          <div
+            className="token-balance-progress-fill"
+            style={{
+              width: `${Math.min(data.percentage, 100)}%`,
+              backgroundColor: progressBarColor(data.percentage)
+            }}
+          ></div>
+        </div>
+      )}
     </div>
   );
 }
 
-function renderVtBalanceRow(balanceData) {
+function renderVtBalanceRow(balanceData, hideVtTargetPercentage) {
   return VT_BALANCE_SLOTS.map(({ column, tokenKey }) => {
     if (tokenKey === null) {
       return (
@@ -192,7 +199,7 @@ function renderVtBalanceRow(balanceData) {
         />
       );
     }
-    return renderVtTokenBalanceCube(tokenKey, balanceData[tokenKey]);
+    return renderVtTokenBalanceCube(tokenKey, balanceData[tokenKey], hideVtTargetPercentage);
   });
 }
 
@@ -219,6 +226,7 @@ export function HomePage() {
   const [mainnetTokenBalances, setMainnetTokenBalances] = useState(null);
   const [vtTokenBalances, setVtTokenBalances] = useState(null);
   const [globalTokenBalances, setGlobalTokenBalances] = useState(null);
+  const [hideVtTargetPercentage, setHideVtTargetPercentage] = useState(true);
   const [vtWalletValue, setVtWalletValue] = useState(null);
   const [mainnetWalletValue, setMainnetWalletValue] = useState(null);
   const [mainnetMinUSDValue, setMainnetMinUSDValue] = useState(null);
@@ -228,6 +236,10 @@ export function HomePage() {
   const [gasExpenses, setGasExpenses] = useState(null);
   const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
   const [minUSDValue, setMinUSDValue] = useState(null);
+
+  useEffect(() => {
+    setHideVtTargetPercentage(!isUbuntuOrXiaomiMobile());
+  }, []);
 
   useEffect(() => {
     if (!bearerToken) return;
@@ -1065,7 +1077,7 @@ export function HomePage() {
               <section className="token-balances-row">
                 <h4 className="token-balances-row-title">VT wallet</h4>
                 <div className="token-balances-grid token-balances-grid--aligned">
-                  {renderVtBalanceRow(vtTokenBalances)}
+                  {renderVtBalanceRow(vtTokenBalances, hideVtTargetPercentage)}
                 </div>
               </section>
             )}
