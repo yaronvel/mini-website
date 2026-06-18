@@ -150,18 +150,18 @@ function renderVtTokenBalanceCube(tokenName, data) {
           </span>
         </div>
         <div className="token-balance-row">
-          <span className="token-balance-label">Desired Balance:</span>
+          <span className="token-balance-label">Target:</span>
           <span className="token-balance-value">
-            {data.desiredBalance.toLocaleString('en-US', {
+            {data.fixedTarget.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 6
             })}
           </span>
         </div>
         <div className="token-balance-row">
-          <span className="token-balance-label">Target:</span>
+          <span className="token-balance-label">Desired Balance:</span>
           <span className="token-balance-value">
-            {data.fixedTarget.toLocaleString('en-US', {
+            {data.desiredBalance.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 6
             })}
