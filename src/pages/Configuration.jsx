@@ -15,7 +15,10 @@ import {
   SANITY_PNL_ADDRESS,
   CIRCUIT_BREAKER_ADDRESS,
   CIRCUIT_BREAKER_ABI,
-  MEXICAN_PRICER_ABI
+  MEXICAN_PRICER_ABI,
+  MAINNET_TOKENS,
+  MAINNET_CIRCUIT_BREAKER_ADDRESS,
+  MAINNET_WALLET_ADDRESS
 } from '../utils/contract';
 import swapImplV2Abi from '../data/abis/SwapImplV2.json';
 import quoteImplAbi from '../data/abis/QuoteImpl.json';
@@ -53,6 +56,18 @@ const ZEROX_NORMAL_AGGREGATOR_ADDRESS =
 const OKX_AGGREGATOR_ADDRESS =
   '0x0Bf54dd1664E14A01fc8aC3Abe8DD630ea9344D8';
 const OKX_SIGNER_ADDRESS = '0xBeEEE605DC6a531AeB4bc3C809Cf6Dd86674F001';
+
+const MAINNET_SWAP_IMPL_V3_ADDRESS =
+  '0x054F0377e07d2F460151F935Dffc4D880017E63a';
+const MAINNET_QUOTE_IMPL_ADDRESS =
+  '0xfE3d12b21d2602868223E83149bdBbFB5D11e185';
+const MAINNET_TITAN_WRAPPER_ADDRESS =
+  '0x71e790dd841c8A9061487cb3E78C288E75cE0B3d';
+const MAINNET_UNISIG_ADDRESS = '0x5B8c76E2a97746f375F629bDbf54B0e4FF19b803';
+const MAINNET_UNISIG_SAFE_URL =
+  'https://app.safe.global/transactions/queue?safe=eth:0x5B8c76E2a97746f375F629bDbf54B0e4FF19b803';
+const MAINNET_WALLET_SAFE_URL =
+  'https://app.safe.global/transactions/queue?safe=eth:0xc841c89609656a39d9365fd0bab4fd8d59b99155';
 
 const XBASE_DECIMALS = {
   weth: 18,
@@ -597,6 +612,60 @@ export function Configuration() {
             <dt>Imbalance Update role</dt>
             <dd>
               <code>{IMBALANCE_UPDATE_ROLE}</code>
+            </dd>
+          </dl>
+
+          <h2 className="config-section-heading">Useful Mainnet addresses</h2>
+          <dl className="curve-dl useful-addresses-dl">
+            <dt>WETH</dt>
+            <dd>
+              <code>{MAINNET_TOKENS.weth}</code>
+            </dd>
+            <dt>WBTC</dt>
+            <dd>
+              <code>{MAINNET_TOKENS.wbtc}</code>
+            </dd>
+            <dt>USDC</dt>
+            <dd>
+              <code>{MAINNET_TOKENS.usdc}</code>
+            </dd>
+            <dt>SwapImplV3</dt>
+            <dd>
+              <code>{MAINNET_SWAP_IMPL_V3_ADDRESS}</code>
+            </dd>
+            <dt>QuoteImpl</dt>
+            <dd>
+              <code>{MAINNET_QUOTE_IMPL_ADDRESS}</code>
+            </dd>
+            <dt>Circuit breaker</dt>
+            <dd>
+              <code>{MAINNET_CIRCUIT_BREAKER_ADDRESS}</code>
+            </dd>
+            <dt>Titan wrapper</dt>
+            <dd>
+              <code>{MAINNET_TITAN_WRAPPER_ADDRESS}</code>
+            </dd>
+            <dt>unisig</dt>
+            <dd>
+              <a
+                className="config-useful-link"
+                href={MAINNET_UNISIG_SAFE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {MAINNET_UNISIG_ADDRESS}
+              </a>
+            </dd>
+            <dt>wallet</dt>
+            <dd>
+              <a
+                className="config-useful-link"
+                href={MAINNET_WALLET_SAFE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {MAINNET_WALLET_ADDRESS}
+              </a>
             </dd>
           </dl>
 
