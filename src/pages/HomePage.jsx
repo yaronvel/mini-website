@@ -245,6 +245,18 @@ function getBestMtm1hKey(mtm) {
   return bestKey;
 }
 
+function getMtm1hTotal(mtm) {
+  let total = 0;
+
+  for (const { key } of MTM_WALLET_CONFIGS) {
+    const change1h = mtm[key]?.change1h;
+    if (change1h == null) return null;
+    total += change1h;
+  }
+
+  return total;
+}
+
 function renderMtmCard(title, change1h, initialBalances, showInitialBalances, isBest) {
   return (
     <div className="wallet-value-card wallet-value-card--simple">
@@ -1201,6 +1213,22 @@ export function HomePage() {
               <span aria-hidden="true" />
               <h3 className="mtm-title" style={{ margin: 0, textAlign: 'center' }}>
                 MTM (1h)
+                {(() => {
+                  const total1h = getMtm1hTotal(mtm);
+                  if (total1h == null) return null;
+                  return (
+                    <>
+                      {' '}
+                      <span className={`pnl-value ${total1h >= 0 ? 'positive' : 'negative'}`}>
+                        {total1h >= 0 ? '+' : ''}$
+                        {total1h.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </>
+                  );
+                })()}
               </h3>
               <button
                 type="button"
