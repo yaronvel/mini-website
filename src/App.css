@@ -42,6 +42,27 @@
   margin-top: 0;
 }
 
+.mtm-section {
+  margin-top: 0.25rem;
+}
+
+.mtm-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-color-scheme: light) {
+  .mtm-title {
+    color: rgba(0, 0, 0, 0.85);
+  }
+}
+
+.mtm-section .wallet-values-grid {
+  margin-top: 0;
+}
+
 .wallet-value-card--simple .wallet-value-main,
 .wallet-value-card--vt .wallet-value-main {
   margin-bottom: 0;

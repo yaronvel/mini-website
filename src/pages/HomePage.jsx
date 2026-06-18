@@ -18,7 +18,8 @@ import {
   buildVtTokenBalancesSnapshot,
   fetchVtWalletUsdcBalance,
   buildGlobalTokenBalancesSnapshot,
-  TOKENS, 
+  fetchMtmSnapshot,
+  TOKENS,
   TOKEN_DECIMALS,
   AGGREGATORS,
   USDC_DIVISOR,
@@ -190,6 +191,128 @@ function renderVtTokenBalanceCube(tokenName, data, hideVtTargetPercentage) {
   );
 }
 
+const MTM_WALLET_CONFIGS = [
+  {
+    key: 'propAmm',
+    title: 'PropAMM wallet',
+    initialBalances: [
+      { label: 'USDC', value: 186706 },
+      { label: 'cbBTC', value: 1.5 },
+      { label: 'WETH', value: 55 },
+      { label: 'Virtual', value: 10000 }
+    ]
+  },
+  {
+    key: 'vt',
+    title: 'VT wallet',
+    initialBalances: [
+      { label: 'USDC', value: 200000 },
+      { label: 'WETH', value: 50 },
+      { label: 'cbBTC', value: 1.1 },
+      { label: 'Virtual', value: 4744 }
+    ]
+  },
+  {
+    key: 'mainnet',
+    title: 'Mainnet PropAMM wallet',
+    initialBalances: [
+      { label: 'USDC', value: 170000 },
+      { label: 'WETH', value: 20 },
+      { label: 'WBTC', value: 0.5 }
+    ]
+  }
+];
+
+function formatMtmInitialBalance(value) {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
+  });
+}
+
+function getBestMtm1hKey(mtm) {
+  let bestKey = null;
+  let bestValue = -Infinity;
+
+  for (const { key } of MTM_WALLET_CONFIGS) {
+    const change1h = mtm[key]?.change1h;
+    if (change1h != null && change1h > bestValue) {
+      bestValue = change1h;
+      bestKey = key;
+    }
+  }
+
+  return bestKey;
+}
+
+function renderMtmCard(title, change1h, initialBalances, showInitialBalances, isBest) {
+  return (
+    <div className="wallet-value-card wallet-value-card--simple">
+      <div className="wallet-value-main">
+        <div className="wallet-value-main-left">
+          <span className="wallet-value-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            {title}
+            {isBest && (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="#f5c542"
+                stroke="#d4a017"
+                strokeWidth="1.25"
+                strokeLinejoin="round"
+                aria-label="Best 1h MTM"
+                title="Best 1h MTM"
+              >
+                <path d="M5 18h14l-1.2-7.2-2.8 3.2-3-5.2-3 5.2-2.8-3.2L5 18z" />
+                <path d="M5 18v2h14v-2" fill="#f5c542" />
+                <circle cx="5" cy="8" r="1.5" fill="#f5c542" />
+                <circle cx="12" cy="5" r="1.5" fill="#f5c542" />
+                <circle cx="19" cy="8" r="1.5" fill="#f5c542" />
+              </svg>
+            )}
+          </span>
+          {change1h != null ? (
+            <span
+              className={`wallet-value-amount pnl-value ${change1h >= 0 ? 'positive' : 'negative'}`}
+            >
+              {change1h >= 0 ? '+' : ''}$
+              {change1h.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })}
+            </span>
+          ) : (
+            <span className="wallet-value-amount">—</span>
+          )}
+        </div>
+      </div>
+      {showInitialBalances && (
+        <div className="token-balance-details" style={{ marginTop: '0.75rem' }}>
+          <div
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              opacity: 0.7,
+              marginBottom: '0.35rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            Initial Balance
+          </div>
+          {initialBalances.map(({ label, value }) => (
+            <div key={label} className="token-balance-row">
+              <span className="token-balance-label">{label}:</span>
+              <span className="token-balance-value">{formatMtmInitialBalance(value)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function renderVtBalanceRow(balanceData, hideVtTargetPercentage) {
   return VT_BALANCE_SLOTS.map(({ column, tokenKey }) => {
     if (tokenKey === null) {
@@ -229,9 +352,11 @@ export function HomePage() {
   const [vtTokenBalances, setVtTokenBalances] = useState(null);
   const [globalTokenBalances, setGlobalTokenBalances] = useState(null);
   const [hideVtTargetPercentage, setHideVtTargetPercentage] = useState(true);
+  const [showMtmInitialBalances, setShowMtmInitialBalances] = useState(false);
   const [vtWalletValue, setVtWalletValue] = useState(null);
   const [mainnetWalletValue, setMainnetWalletValue] = useState(null);
   const [mainnetMinUSDValue, setMainnetMinUSDValue] = useState(null);
+  const [mtm, setMtm] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [sanityPnl, setSanityPnl] = useState(null);
   const [protocolFees, setProtocolFees] = useState(null);
@@ -436,6 +561,14 @@ export function HomePage() {
         console.warn('Mainnet wallet value fetch failed:', e);
         setMainnetWalletValue(null);
         setMainnetMinUSDValue(null);
+      }
+
+      try {
+        const mtmSnapshot = await fetchMtmSnapshot(bearerToken, walletAddress);
+        setMtm(mtmSnapshot);
+      } catch (e) {
+        console.warn('MTM fetch failed:', e);
+        setMtm(null);
       }
 
       // First block timestamp (local so PnL labels can use it in the same fetch)
@@ -1052,6 +1185,86 @@ export function HomePage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {mtm && (
+          <div className="mtm-section">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '2rem 1fr 2rem',
+                alignItems: 'center',
+                marginBottom: '0.75rem'
+              }}
+            >
+              <span aria-hidden="true" />
+              <h3 className="mtm-title" style={{ margin: 0, textAlign: 'center' }}>
+                MTM (1h)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowMtmInitialBalances((visible) => !visible)}
+                aria-label={
+                  showMtmInitialBalances
+                    ? 'Hide initial balances'
+                    : 'Show initial balances'
+                }
+                title={
+                  showMtmInitialBalances
+                    ? 'Hide initial balances'
+                    : 'Show initial balances'
+                }
+                aria-pressed={showMtmInitialBalances}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem',
+                  padding: 0,
+                  border: '1px solid rgba(100, 108, 255, 0.35)',
+                  borderRadius: '8px',
+                  background: showMtmInitialBalances
+                    ? 'rgba(100, 108, 255, 0.2)'
+                    : 'transparent',
+                  color: 'inherit',
+                  cursor: 'pointer'
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4 7h16" />
+                  <path d="M4 12h16" />
+                  <path d="M4 17h10" />
+                  <circle cx="18" cy="17" r="2" />
+                </svg>
+              </button>
+            </div>
+            <div className="wallet-values-grid">
+              {(() => {
+                const bestMtm1hKey = getBestMtm1hKey(mtm);
+                return MTM_WALLET_CONFIGS.map(({ key, title, initialBalances }) => {
+                  const entry = mtm[key];
+                  return renderMtmCard(
+                    title,
+                    entry?.change1h ?? null,
+                    initialBalances,
+                    showMtmInitialBalances,
+                    bestMtm1hKey != null && key === bestMtm1hKey
+                  );
+                });
+              })()}
+            </div>
           </div>
         )}
         

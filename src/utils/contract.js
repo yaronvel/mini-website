@@ -118,6 +118,52 @@ export const VT_WALLET_LISTED_TOKENS = [
   TOKENS.virtual
 ];
 
+export const BASE_CIRCUIT_BREAKER_VIEW_ONLY_ADDRESS =
+  '0xba831C1E08A9b2F1621a175c48deC23E97a85C27';
+export const MAINNET_CIRCUIT_BREAKER_VIEW_ONLY_ADDRESS =
+  '0x6B8629D8d6ba1691Df800A5a5c270619AD86d37F';
+
+export const CIRCUIT_BREAKER_VIEW_ONLY_ABI = [
+  {
+    inputs: [
+      { internalType: 'address', name: 'walletAddress', type: 'address' },
+      { internalType: 'address[]', name: 'listedTokens', type: 'address[]' },
+      { internalType: 'int256[]', name: 'targets', type: 'int256[]' },
+      { internalType: 'int256', name: 'usdcTarget', type: 'int256' }
+    ],
+    name: 'getPnl',
+    outputs: [{ internalType: 'int256', name: '', type: 'int256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+/** Base PropAMM MTM token order (cbbtc, weth, virtual) — matches on-chain getPnl usage. */
+export const BASE_PROP_AMM_MTM_LISTED_TOKENS = [
+  TOKENS.cbbtc,
+  TOKENS.weth,
+  TOKENS.virtual
+];
+
+export const BASE_PROP_AMM_MTM_TARGETS = [
+  ethers.parseUnits('1.5', TOKEN_DECIMALS.cbbtc),
+  ethers.parseUnits('55', TOKEN_DECIMALS.weth),
+  ethers.parseUnits('10000', TOKEN_DECIMALS.virtual)
+];
+
+export const BASE_PROP_AMM_MTM_USDC_TARGET = ethers.parseUnits('186706', TOKEN_DECIMALS.usdc);
+
+/** VT wallet MTM token order matches {@link VT_WALLET_LISTED_TOKENS}. */
+export const VT_MTM_LISTED_TOKENS = VT_WALLET_LISTED_TOKENS;
+
+export const VT_MTM_TARGETS = [
+  ethers.parseUnits('50', TOKEN_DECIMALS.weth),
+  ethers.parseUnits('1.1', TOKEN_DECIMALS.cbbtc),
+  ethers.parseUnits('4744', TOKEN_DECIMALS.virtual)
+];
+
+export const VT_MTM_USDC_TARGET = ethers.parseUnits('200000', TOKEN_DECIMALS.usdc);
+
 /** Base-chain tokens tracked in the VT wallet balances row. */
 export const VT_BALANCE_TOKENS = {
   weth: TOKENS.weth,
@@ -151,6 +197,19 @@ export const MAINNET_TOKEN_DECIMALS = {
   wbtc: 8,
   usdc: 6
 };
+
+/** Mainnet PropAMM MTM token order (weth, wbtc). */
+export const MAINNET_MTM_LISTED_TOKENS = MAINNET_WALLET_LISTED_TOKENS;
+
+export const MAINNET_MTM_TARGETS = [
+  ethers.parseUnits('20', MAINNET_TOKEN_DECIMALS.weth),
+  ethers.parseUnits('0.5', MAINNET_TOKEN_DECIMALS.wbtc)
+];
+
+export const MAINNET_MTM_USDC_TARGET = ethers.parseUnits(
+  '170000',
+  MAINNET_TOKEN_DECIMALS.usdc
+);
 
 /** Tokens shown in the mainnet PropAMM token-balances row (WBTC replaces cbBTC). */
 export const MAINNET_BALANCE_TOKENS = {
@@ -200,7 +259,8 @@ export const AGGREGATORS = {
   fibrous: '0x274602a953847d807231d2370072f5f4e4594b44',
   liquidMeshQA: '0xe5d4b6fa308335350e6b992c8a189eab51b22fae',
   liquidMesh: '0xf5ae73ca5ed58a30886b88e74d0ba1931d315a8c',
-  rebalance: '0x8301b8c7a8f6AC40A471f61Fe3D746e3A106c983'
+  rebalance: '0x8301b8c7a8f6AC40A471f61Fe3D746e3A106c983',
+  bitget: '0xE0D0053d628a29ECE601ddab38662f1a68b34643'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
@@ -216,7 +276,8 @@ export const AGGREGATOR_DISPLAY_NAMES = {
   fibrous: 'Fibrous',
   liquidMeshQA: 'LiquidMesh (QA)',
   liquidMesh: 'LiquidMesh',
-  rebalance: 'Rebalance'
+  rebalance: 'Rebalance',
+  bitget: 'Bitget'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
@@ -262,6 +323,195 @@ export function getWalletValueViewContract(provider) {
     WALLET_VALUE_VIEW_CONTRACT_ABI,
     provider
   );
+}
+
+export function getBaseCircuitBreakerViewOnlyContract(provider) {
+  return new ethers.Contract(
+    BASE_CIRCUIT_BREAKER_VIEW_ONLY_ADDRESS,
+    CIRCUIT_BREAKER_VIEW_ONLY_ABI,
+    provider
+  );
+}
+
+export function getMainnetCircuitBreakerViewOnlyContract(provider) {
+  return new ethers.Contract(
+    MAINNET_CIRCUIT_BREAKER_VIEW_ONLY_ADDRESS,
+    CIRCUIT_BREAKER_VIEW_ONLY_ABI,
+    provider
+  );
+}
+
+async function readMtmPnl(
+  chainLabel,
+  contract,
+  walletAddress,
+  listedTokens,
+  targets,
+  usdcTarget,
+  blockTag,
+  retries = 3
+) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await contract.getPnl(
+        walletAddress,
+        listedTokens,
+        targets,
+        usdcTarget,
+        { blockTag }
+      );
+      return Number(result.toString());
+    } catch (error) {
+      if (attempt === retries) {
+        console.warn(
+          `MTM getPnl (${chainLabel}) reverted at block ${blockTag} after ${retries} attempts`
+        );
+        return null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+    }
+  }
+  return null;
+}
+
+export const MAINNET_BLOCK_TIME_SECONDS = 12;
+
+function mtmOneHourAgoBlock(currentBlock, blockTimeSeconds, minBlock = 0) {
+  const blocksPerHour = Math.floor(3600 / blockTimeSeconds);
+  const calculated = currentBlock - blocksPerHour;
+  return {
+    block: Math.max(minBlock, calculated),
+    hasFull1hData: calculated >= minBlock
+  };
+}
+
+function mtmChange1h(current, previous, hasFull1hData) {
+  return current != null && previous != null && hasFull1hData
+    ? current - previous
+    : null;
+}
+
+/** Mark-to-market PnL for Base PropAMM, VT, and mainnet PropAMM wallets. */
+export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
+  const baseProvider = getProvider(bearerToken);
+  const mainnetProvider = getMainnetProvider(bearerToken);
+  const baseView = getBaseCircuitBreakerViewOnlyContract(baseProvider);
+  const mainnetView = getMainnetCircuitBreakerViewOnlyContract(mainnetProvider);
+
+  const [baseBlockNow, mainnetBlockNow] = await Promise.all([
+    baseProvider.getBlockNumber(),
+    mainnetProvider.getBlockNumber()
+  ]);
+
+  const baseOneHour = mtmOneHourAgoBlock(
+    baseBlockNow,
+    BLOCK_TIME_SECONDS,
+    FIRST_BLOCK
+  );
+  const mainnetOneHour = mtmOneHourAgoBlock(
+    mainnetBlockNow,
+    MAINNET_BLOCK_TIME_SECONDS
+  );
+
+  const [
+    propAmmNow,
+    propAmm1h,
+    vtNow,
+    vt1h,
+    mainnetNow,
+    mainnet1h,
+    feesNow,
+    fees1h
+  ] = await Promise.all([
+    readMtmPnl(
+      'base',
+      baseView,
+      basePropAmmWalletAddress,
+      BASE_PROP_AMM_MTM_LISTED_TOKENS,
+      BASE_PROP_AMM_MTM_TARGETS,
+      BASE_PROP_AMM_MTM_USDC_TARGET,
+      baseBlockNow
+    ),
+    baseOneHour.hasFull1hData
+      ? readMtmPnl(
+          'base',
+          baseView,
+          basePropAmmWalletAddress,
+          BASE_PROP_AMM_MTM_LISTED_TOKENS,
+          BASE_PROP_AMM_MTM_TARGETS,
+          BASE_PROP_AMM_MTM_USDC_TARGET,
+          baseOneHour.block
+        )
+      : Promise.resolve(null),
+    readMtmPnl(
+      'base',
+      baseView,
+      VT_WALLET_ADDRESS,
+      VT_MTM_LISTED_TOKENS,
+      VT_MTM_TARGETS,
+      VT_MTM_USDC_TARGET,
+      baseBlockNow
+    ),
+    baseOneHour.hasFull1hData
+      ? readMtmPnl(
+          'base',
+          baseView,
+          VT_WALLET_ADDRESS,
+          VT_MTM_LISTED_TOKENS,
+          VT_MTM_TARGETS,
+          VT_MTM_USDC_TARGET,
+          baseOneHour.block
+        )
+      : Promise.resolve(null),
+    readMtmPnl(
+      'mainnet',
+      mainnetView,
+      MAINNET_WALLET_ADDRESS,
+      MAINNET_MTM_LISTED_TOKENS,
+      MAINNET_MTM_TARGETS,
+      MAINNET_MTM_USDC_TARGET,
+      mainnetBlockNow
+    ),
+    mainnetOneHour.hasFull1hData
+      ? readMtmPnl(
+          'mainnet',
+          mainnetView,
+          MAINNET_WALLET_ADDRESS,
+          MAINNET_MTM_LISTED_TOKENS,
+          MAINNET_MTM_TARGETS,
+          MAINNET_MTM_USDC_TARGET,
+          mainnetOneHour.block
+        )
+      : Promise.resolve(null),
+    fetchProtocolFeesSinceJune(baseProvider, baseBlockNow),
+    baseOneHour.hasFull1hData
+      ? fetchProtocolFeesSinceJune(baseProvider, baseOneHour.block)
+      : Promise.resolve(null)
+  ]);
+
+  const propAmmAdjustedNow =
+    propAmmNow != null ? propAmmNow - feesNow : null;
+  const propAmmAdjusted1h =
+    propAmm1h != null && fees1h != null ? propAmm1h - fees1h : null;
+
+  return {
+    propAmm: {
+      value: propAmmAdjustedNow,
+      change1h: mtmChange1h(
+        propAmmAdjustedNow,
+        propAmmAdjusted1h,
+        baseOneHour.hasFull1hData
+      )
+    },
+    vt: {
+      value: vtNow,
+      change1h: mtmChange1h(vtNow, vt1h, baseOneHour.hasFull1hData)
+    },
+    mainnet: {
+      value: mainnetNow,
+      change1h: mtmChange1h(mainnetNow, mainnet1h, mainnetOneHour.hasFull1hData)
+    }
+  };
 }
 
 /** USD value for VT wallet via CircuitBreakerViewOnly.getWalletValue (Base). */
@@ -594,10 +844,9 @@ export async function fetchProtocolFeesSinceJune(provider, currentBlock) {
     const feeDeltaWei = feesCurrent - feesJuneStart;
 
     try {
-      const usdResult = await sanityContract.getUSDValue(
-        tokenAddress,
-        feeDeltaWei
-      );
+      const usdResult = await sanityContract.getUSDValue(tokenAddress, feeDeltaWei, {
+        blockTag: currentBlock
+      });
       totalUsdRaw += BigInt(usdResult.toString());
     } catch (error) {
       console.warn(`getUSDValue failed for ${tokenKey}:`, error);
