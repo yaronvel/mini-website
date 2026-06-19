@@ -456,6 +456,12 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     BLOCK_TIME_SECONDS,
     FIRST_BLOCK
   );
+  const baseTwentyFourHours = mtmHoursAgoBlock(
+    baseBlockNow,
+    24,
+    BLOCK_TIME_SECONDS,
+    FIRST_BLOCK
+  );
   const mainnetOneHour = mtmHoursAgoBlock(
     mainnetBlockNow,
     1,
@@ -466,20 +472,29 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     12,
     MAINNET_BLOCK_TIME_SECONDS
   );
+  const mainnetTwentyFourHours = mtmHoursAgoBlock(
+    mainnetBlockNow,
+    24,
+    MAINNET_BLOCK_TIME_SECONDS
+  );
 
   const [
     propAmmNow,
     propAmm1h,
     propAmm12h,
+    propAmm24h,
     vtNow,
     vt1h,
     vt12h,
+    vt24h,
     mainnetNow,
     mainnet1h,
     mainnet12h,
+    mainnet24h,
     feesNow,
     fees1h,
-    fees12h
+    fees12h,
+    fees24h
   ] = await Promise.all([
     readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseBlockNow),
     baseOneHour.hasFullData
@@ -488,12 +503,18 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     baseTwelveHours.hasFullData
       ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwelveHours.block)
       : Promise.resolve(null),
+    baseTwentyFourHours.hasFullData
+      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwentyFourHours.block)
+      : Promise.resolve(null),
     readVtMtmAtBlock(baseView, baseBlockNow),
     baseOneHour.hasFullData
       ? readVtMtmAtBlock(baseView, baseOneHour.block)
       : Promise.resolve(null),
     baseTwelveHours.hasFullData
       ? readVtMtmAtBlock(baseView, baseTwelveHours.block)
+      : Promise.resolve(null),
+    baseTwentyFourHours.hasFullData
+      ? readVtMtmAtBlock(baseView, baseTwentyFourHours.block)
       : Promise.resolve(null),
     readMainnetMtmAtBlock(mainnetView, mainnetBlockNow),
     mainnetOneHour.hasFullData
@@ -502,12 +523,18 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     mainnetTwelveHours.hasFullData
       ? readMainnetMtmAtBlock(mainnetView, mainnetTwelveHours.block)
       : Promise.resolve(null),
+    mainnetTwentyFourHours.hasFullData
+      ? readMainnetMtmAtBlock(mainnetView, mainnetTwentyFourHours.block)
+      : Promise.resolve(null),
     fetchProtocolFeesSinceJune(baseProvider, baseBlockNow),
     baseOneHour.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseOneHour.block)
       : Promise.resolve(null),
     baseTwelveHours.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseTwelveHours.block)
+      : Promise.resolve(null),
+    baseTwentyFourHours.hasFullData
+      ? fetchProtocolFeesSinceJune(baseProvider, baseTwentyFourHours.block)
       : Promise.resolve(null)
   ]);
 
@@ -517,6 +544,8 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     propAmm1h != null && fees1h != null ? propAmm1h - fees1h : null;
   const propAmmAdjusted12h =
     propAmm12h != null && fees12h != null ? propAmm12h - fees12h : null;
+  const propAmmAdjusted24h =
+    propAmm24h != null && fees24h != null ? propAmm24h - fees24h : null;
 
   return {
     propAmm: {
@@ -530,12 +559,18 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
         propAmmAdjustedNow,
         propAmmAdjusted12h,
         baseTwelveHours.hasFullData
+      ),
+      change24h: mtmPeriodChange(
+        propAmmAdjustedNow,
+        propAmmAdjusted24h,
+        baseTwentyFourHours.hasFullData
       )
     },
     vt: {
       value: vtNow,
       change1h: mtmPeriodChange(vtNow, vt1h, baseOneHour.hasFullData),
-      change12h: mtmPeriodChange(vtNow, vt12h, baseTwelveHours.hasFullData)
+      change12h: mtmPeriodChange(vtNow, vt12h, baseTwelveHours.hasFullData),
+      change24h: mtmPeriodChange(vtNow, vt24h, baseTwentyFourHours.hasFullData)
     },
     mainnet: {
       value: mainnetNow,
@@ -544,6 +579,11 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
         mainnetNow,
         mainnet12h,
         mainnetTwelveHours.hasFullData
+      ),
+      change24h: mtmPeriodChange(
+        mainnetNow,
+        mainnet24h,
+        mainnetTwentyFourHours.hasFullData
       )
     }
   };

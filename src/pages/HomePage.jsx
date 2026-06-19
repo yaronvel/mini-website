@@ -223,6 +223,12 @@ const MTM_WALLET_CONFIGS = [
   }
 ];
 
+const MTM_PERIODS = [
+  { key: 'change1h', label: '1h MTM', totalLabel: '1h total' },
+  { key: 'change12h', label: '12h MTM', totalLabel: '12h total' },
+  { key: 'change24h', label: '24h MTM', totalLabel: '24h total' }
+];
+
 function formatMtmInitialBalance(value) {
   return value.toLocaleString('en-US', {
     minimumFractionDigits: 0,
@@ -315,20 +321,24 @@ function renderMtmTotalMetric(label, total) {
 }
 
 function renderMtmCard(
+  walletKey,
   title,
-  change1h,
-  change12h,
+  entry,
   initialBalances,
   showInitialBalances,
-  isBest1h,
-  isBest12h
+  mtm
 ) {
   return (
     <div className="wallet-value-card mtm-card">
       <div className="mtm-card-title">{title}</div>
       <div className="mtm-metrics-grid">
-        {renderMtmMetric('1h MTM', change1h, isBest1h)}
-        {renderMtmMetric('12h MTM', change12h, isBest12h)}
+        {MTM_PERIODS.map(({ key, label }) =>
+          renderMtmMetric(
+            label,
+            entry?.[key] ?? null,
+            getBestMtmKey(mtm, key) === walletKey
+          )
+        )}
       </div>
       {showInitialBalances && (
         <div className="token-balance-details mtm-initial-balances">
@@ -1227,8 +1237,9 @@ export function HomePage() {
               <div className="mtm-header-center">
                 <h3 className="mtm-title">MTM</h3>
                 <div className="mtm-totals-grid">
-                  {renderMtmTotalMetric('1h total', getMtmPeriodTotal(mtm, 'change1h'))}
-                  {renderMtmTotalMetric('12h total', getMtmPeriodTotal(mtm, 'change12h'))}
+                  {MTM_PERIODS.map(({ key, totalLabel }) =>
+                    renderMtmTotalMetric(totalLabel, getMtmPeriodTotal(mtm, key))
+                  )}
                 </div>
               </div>
               <button
@@ -1266,22 +1277,16 @@ export function HomePage() {
               </button>
             </div>
             <div className="wallet-values-grid">
-              {(() => {
-                const bestMtm1hKey = getBestMtmKey(mtm, 'change1h');
-                const bestMtm12hKey = getBestMtmKey(mtm, 'change12h');
-                return MTM_WALLET_CONFIGS.map(({ key, title, initialBalances }) => {
-                  const entry = mtm[key];
-                  return renderMtmCard(
-                    title,
-                    entry?.change1h ?? null,
-                    entry?.change12h ?? null,
-                    initialBalances,
-                    showMtmInitialBalances,
-                    bestMtm1hKey != null && key === bestMtm1hKey,
-                    bestMtm12hKey != null && key === bestMtm12hKey
-                  );
-                });
-              })()}
+              {MTM_WALLET_CONFIGS.map(({ key, title, initialBalances }) =>
+                renderMtmCard(
+                  key,
+                  title,
+                  mtm[key],
+                  initialBalances,
+                  showMtmInitialBalances,
+                  mtm
+                )
+              )}
             </div>
           </div>
         )}
