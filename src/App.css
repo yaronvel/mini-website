@@ -46,21 +46,179 @@
   margin-top: 0.25rem;
 }
 
+.mtm-section-header {
+  display: grid;
+  grid-template-columns: 2rem 1fr 2rem;
+  align-items: start;
+  margin-bottom: 0.75rem;
+}
+
+.mtm-header-center {
+  text-align: center;
+}
+
 .mtm-title {
-  margin: 0 0 0.75rem;
+  margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
+}
+
+.mtm-totals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  max-width: 28rem;
+  margin: 0.65rem auto 0;
+}
+
+.mtm-total-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(100, 108, 255, 0.1);
+  border: 1px solid rgba(100, 108, 255, 0.22);
+}
+
+.mtm-total-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mtm-total-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.mtm-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid rgba(100, 108, 255, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mtm-toggle-btn[aria-pressed='true'] {
+  background: rgba(100, 108, 255, 0.2);
+}
+
+.mtm-section .wallet-values-grid {
+  margin-top: 0;
+}
+
+.mtm-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.mtm-card-title {
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 0.15rem;
+}
+
+.mtm-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.mtm-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 4.5rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(100, 108, 255, 0.08);
+  border: 1px solid rgba(100, 108, 255, 0.18);
+}
+
+.mtm-metric--best {
+  border-color: rgba(245, 197, 66, 0.45);
+  background: rgba(245, 197, 66, 0.1);
+  box-shadow: 0 0 0 1px rgba(245, 197, 66, 0.15);
+}
+
+.mtm-metric-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.mtm-metric-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.mtm-crown-icon {
+  flex-shrink: 0;
+}
+
+.mtm-initial-balances {
+  margin-top: 0.85rem;
+}
+
+.mtm-initial-balances-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 @media (prefers-color-scheme: light) {
   .mtm-title {
     color: rgba(0, 0, 0, 0.85);
   }
-}
 
-.mtm-section .wallet-values-grid {
-  margin-top: 0;
+  .mtm-total-metric {
+    background: rgba(100, 108, 255, 0.06);
+    border-color: rgba(100, 108, 255, 0.14);
+  }
+
+  .mtm-total-label,
+  .mtm-metric-label {
+    color: rgba(0, 0, 0, 0.55);
+  }
+
+  .mtm-card-title {
+    color: rgba(0, 0, 0, 0.82);
+  }
+
+  .mtm-metric {
+    background: rgba(100, 108, 255, 0.05);
+    border-color: rgba(100, 108, 255, 0.12);
+  }
+
+  .mtm-metric--best {
+    background: rgba(245, 197, 66, 0.14);
+    border-color: rgba(212, 160, 23, 0.35);
+  }
 }
 
 .wallet-value-card--simple .wallet-value-main,

@@ -376,19 +376,60 @@ async function readMtmPnl(
 
 export const MAINNET_BLOCK_TIME_SECONDS = 12;
 
-function mtmOneHourAgoBlock(currentBlock, blockTimeSeconds, minBlock = 0) {
+function mtmHoursAgoBlock(currentBlock, hours, blockTimeSeconds, minBlock = 0) {
   const blocksPerHour = Math.floor(3600 / blockTimeSeconds);
-  const calculated = currentBlock - blocksPerHour;
+  const calculated = currentBlock - blocksPerHour * hours;
   return {
     block: Math.max(minBlock, calculated),
-    hasFull1hData: calculated >= minBlock
+    hasFullData: calculated >= minBlock
   };
 }
 
-function mtmChange1h(current, previous, hasFull1hData) {
-  return current != null && previous != null && hasFull1hData
+function mtmPeriodChange(current, previous, hasFullData) {
+  return current != null && previous != null && hasFullData
     ? current - previous
     : null;
+}
+
+async function readPropAmmMtmAtBlock(
+  chainLabel,
+  baseView,
+  walletAddress,
+  blockTag
+) {
+  return readMtmPnl(
+    chainLabel,
+    baseView,
+    walletAddress,
+    BASE_PROP_AMM_MTM_LISTED_TOKENS,
+    BASE_PROP_AMM_MTM_TARGETS,
+    BASE_PROP_AMM_MTM_USDC_TARGET,
+    blockTag
+  );
+}
+
+async function readVtMtmAtBlock(baseView, blockTag) {
+  return readMtmPnl(
+    'base',
+    baseView,
+    VT_WALLET_ADDRESS,
+    VT_MTM_LISTED_TOKENS,
+    VT_MTM_TARGETS,
+    VT_MTM_USDC_TARGET,
+    blockTag
+  );
+}
+
+async function readMainnetMtmAtBlock(mainnetView, blockTag) {
+  return readMtmPnl(
+    'mainnet',
+    mainnetView,
+    MAINNET_WALLET_ADDRESS,
+    MAINNET_MTM_LISTED_TOKENS,
+    MAINNET_MTM_TARGETS,
+    MAINNET_MTM_USDC_TARGET,
+    blockTag
+  );
 }
 
 /** Mark-to-market PnL for Base PropAMM, VT, and mainnet PropAMM wallets. */
@@ -403,89 +444,70 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     mainnetProvider.getBlockNumber()
   ]);
 
-  const baseOneHour = mtmOneHourAgoBlock(
+  const baseOneHour = mtmHoursAgoBlock(
     baseBlockNow,
+    1,
     BLOCK_TIME_SECONDS,
     FIRST_BLOCK
   );
-  const mainnetOneHour = mtmOneHourAgoBlock(
+  const baseTwelveHours = mtmHoursAgoBlock(
+    baseBlockNow,
+    12,
+    BLOCK_TIME_SECONDS,
+    FIRST_BLOCK
+  );
+  const mainnetOneHour = mtmHoursAgoBlock(
     mainnetBlockNow,
+    1,
+    MAINNET_BLOCK_TIME_SECONDS
+  );
+  const mainnetTwelveHours = mtmHoursAgoBlock(
+    mainnetBlockNow,
+    12,
     MAINNET_BLOCK_TIME_SECONDS
   );
 
   const [
     propAmmNow,
     propAmm1h,
+    propAmm12h,
     vtNow,
     vt1h,
+    vt12h,
     mainnetNow,
     mainnet1h,
+    mainnet12h,
     feesNow,
-    fees1h
+    fees1h,
+    fees12h
   ] = await Promise.all([
-    readMtmPnl(
-      'base',
-      baseView,
-      basePropAmmWalletAddress,
-      BASE_PROP_AMM_MTM_LISTED_TOKENS,
-      BASE_PROP_AMM_MTM_TARGETS,
-      BASE_PROP_AMM_MTM_USDC_TARGET,
-      baseBlockNow
-    ),
-    baseOneHour.hasFull1hData
-      ? readMtmPnl(
-          'base',
-          baseView,
-          basePropAmmWalletAddress,
-          BASE_PROP_AMM_MTM_LISTED_TOKENS,
-          BASE_PROP_AMM_MTM_TARGETS,
-          BASE_PROP_AMM_MTM_USDC_TARGET,
-          baseOneHour.block
-        )
+    readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseBlockNow),
+    baseOneHour.hasFullData
+      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseOneHour.block)
       : Promise.resolve(null),
-    readMtmPnl(
-      'base',
-      baseView,
-      VT_WALLET_ADDRESS,
-      VT_MTM_LISTED_TOKENS,
-      VT_MTM_TARGETS,
-      VT_MTM_USDC_TARGET,
-      baseBlockNow
-    ),
-    baseOneHour.hasFull1hData
-      ? readMtmPnl(
-          'base',
-          baseView,
-          VT_WALLET_ADDRESS,
-          VT_MTM_LISTED_TOKENS,
-          VT_MTM_TARGETS,
-          VT_MTM_USDC_TARGET,
-          baseOneHour.block
-        )
+    baseTwelveHours.hasFullData
+      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwelveHours.block)
       : Promise.resolve(null),
-    readMtmPnl(
-      'mainnet',
-      mainnetView,
-      MAINNET_WALLET_ADDRESS,
-      MAINNET_MTM_LISTED_TOKENS,
-      MAINNET_MTM_TARGETS,
-      MAINNET_MTM_USDC_TARGET,
-      mainnetBlockNow
-    ),
-    mainnetOneHour.hasFull1hData
-      ? readMtmPnl(
-          'mainnet',
-          mainnetView,
-          MAINNET_WALLET_ADDRESS,
-          MAINNET_MTM_LISTED_TOKENS,
-          MAINNET_MTM_TARGETS,
-          MAINNET_MTM_USDC_TARGET,
-          mainnetOneHour.block
-        )
+    readVtMtmAtBlock(baseView, baseBlockNow),
+    baseOneHour.hasFullData
+      ? readVtMtmAtBlock(baseView, baseOneHour.block)
+      : Promise.resolve(null),
+    baseTwelveHours.hasFullData
+      ? readVtMtmAtBlock(baseView, baseTwelveHours.block)
+      : Promise.resolve(null),
+    readMainnetMtmAtBlock(mainnetView, mainnetBlockNow),
+    mainnetOneHour.hasFullData
+      ? readMainnetMtmAtBlock(mainnetView, mainnetOneHour.block)
+      : Promise.resolve(null),
+    mainnetTwelveHours.hasFullData
+      ? readMainnetMtmAtBlock(mainnetView, mainnetTwelveHours.block)
       : Promise.resolve(null),
     fetchProtocolFeesSinceJune(baseProvider, baseBlockNow),
-    baseOneHour.hasFull1hData
+    baseOneHour.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseOneHour.block)
+      : Promise.resolve(null),
+    baseTwelveHours.hasFullData
+      ? fetchProtocolFeesSinceJune(baseProvider, baseTwelveHours.block)
       : Promise.resolve(null)
   ]);
 
@@ -493,23 +515,36 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     propAmmNow != null ? propAmmNow - feesNow : null;
   const propAmmAdjusted1h =
     propAmm1h != null && fees1h != null ? propAmm1h - fees1h : null;
+  const propAmmAdjusted12h =
+    propAmm12h != null && fees12h != null ? propAmm12h - fees12h : null;
 
   return {
     propAmm: {
       value: propAmmAdjustedNow,
-      change1h: mtmChange1h(
+      change1h: mtmPeriodChange(
         propAmmAdjustedNow,
         propAmmAdjusted1h,
-        baseOneHour.hasFull1hData
+        baseOneHour.hasFullData
+      ),
+      change12h: mtmPeriodChange(
+        propAmmAdjustedNow,
+        propAmmAdjusted12h,
+        baseTwelveHours.hasFullData
       )
     },
     vt: {
       value: vtNow,
-      change1h: mtmChange1h(vtNow, vt1h, baseOneHour.hasFull1hData)
+      change1h: mtmPeriodChange(vtNow, vt1h, baseOneHour.hasFullData),
+      change12h: mtmPeriodChange(vtNow, vt12h, baseTwelveHours.hasFullData)
     },
     mainnet: {
       value: mainnetNow,
-      change1h: mtmChange1h(mainnetNow, mainnet1h, mainnetOneHour.hasFull1hData)
+      change1h: mtmPeriodChange(mainnetNow, mainnet1h, mainnetOneHour.hasFullData),
+      change12h: mtmPeriodChange(
+        mainnetNow,
+        mainnet12h,
+        mainnetTwelveHours.hasFullData
+      )
     }
   };
 }

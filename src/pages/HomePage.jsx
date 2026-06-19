@@ -230,14 +230,14 @@ function formatMtmInitialBalance(value) {
   });
 }
 
-function getBestMtm1hKey(mtm) {
+function getBestMtmKey(mtm, periodKey) {
   let bestKey = null;
   let bestValue = -Infinity;
 
   for (const { key } of MTM_WALLET_CONFIGS) {
-    const change1h = mtm[key]?.change1h;
-    if (change1h != null && change1h > bestValue) {
-      bestValue = change1h;
+    const change = mtm[key]?.[periodKey];
+    if (change != null && change > bestValue) {
+      bestValue = change;
       bestKey = key;
     }
   }
@@ -245,74 +245,94 @@ function getBestMtm1hKey(mtm) {
   return bestKey;
 }
 
-function getMtm1hTotal(mtm) {
+function getMtmPeriodTotal(mtm, periodKey) {
   let total = 0;
 
   for (const { key } of MTM_WALLET_CONFIGS) {
-    const change1h = mtm[key]?.change1h;
-    if (change1h == null) return null;
-    total += change1h;
+    const change = mtm[key]?.[periodKey];
+    if (change == null) return null;
+    total += change;
   }
 
   return total;
 }
 
-function renderMtmCard(title, change1h, initialBalances, showInitialBalances, isBest) {
+function formatMtmUsd(change) {
+  if (change == null) return '—';
+  return `${change >= 0 ? '+' : ''}$${change.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+}
+
+function MtmCrownIcon() {
   return (
-    <div className="wallet-value-card wallet-value-card--simple">
-      <div className="wallet-value-main">
-        <div className="wallet-value-main-left">
-          <span className="wallet-value-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            {title}
-            {isBest && (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="#f5c542"
-                stroke="#d4a017"
-                strokeWidth="1.25"
-                strokeLinejoin="round"
-                aria-label="Best 1h MTM"
-                title="Best 1h MTM"
-              >
-                <path d="M5 18h14l-1.2-7.2-2.8 3.2-3-5.2-3 5.2-2.8-3.2L5 18z" />
-                <path d="M5 18v2h14v-2" fill="#f5c542" />
-                <circle cx="5" cy="8" r="1.5" fill="#f5c542" />
-                <circle cx="12" cy="5" r="1.5" fill="#f5c542" />
-                <circle cx="19" cy="8" r="1.5" fill="#f5c542" />
-              </svg>
-            )}
-          </span>
-          {change1h != null ? (
-            <span
-              className={`wallet-value-amount pnl-value ${change1h >= 0 ? 'positive' : 'negative'}`}
-            >
-              {change1h >= 0 ? '+' : ''}$
-              {change1h.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              })}
-            </span>
-          ) : (
-            <span className="wallet-value-amount">—</span>
-          )}
-        </div>
+    <svg
+      className="mtm-crown-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="#f5c542"
+      stroke="#d4a017"
+      strokeWidth="1.25"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 18h14l-1.2-7.2-2.8 3.2-3-5.2-3 5.2-2.8-3.2L5 18z" />
+      <path d="M5 18v2h14v-2" fill="#f5c542" />
+      <circle cx="5" cy="8" r="1.5" fill="#f5c542" />
+      <circle cx="12" cy="5" r="1.5" fill="#f5c542" />
+      <circle cx="19" cy="8" r="1.5" fill="#f5c542" />
+    </svg>
+  );
+}
+
+function renderMtmMetric(label, change, isBest) {
+  const valueClass =
+    change == null ? 'mtm-metric-value' : `mtm-metric-value pnl-value ${change >= 0 ? 'positive' : 'negative'}`;
+
+  return (
+    <div className={`mtm-metric${isBest ? ' mtm-metric--best' : ''}`}>
+      <span className="mtm-metric-label">
+        {label}
+        {isBest && <MtmCrownIcon />}
+      </span>
+      <span className={valueClass}>{formatMtmUsd(change)}</span>
+    </div>
+  );
+}
+
+function renderMtmTotalMetric(label, total) {
+  const valueClass =
+    total == null ? 'mtm-total-value' : `mtm-total-value pnl-value ${total >= 0 ? 'positive' : 'negative'}`;
+
+  return (
+    <div className="mtm-total-metric">
+      <span className="mtm-total-label">{label}</span>
+      <span className={valueClass}>{formatMtmUsd(total)}</span>
+    </div>
+  );
+}
+
+function renderMtmCard(
+  title,
+  change1h,
+  change12h,
+  initialBalances,
+  showInitialBalances,
+  isBest1h,
+  isBest12h
+) {
+  return (
+    <div className="wallet-value-card mtm-card">
+      <div className="mtm-card-title">{title}</div>
+      <div className="mtm-metrics-grid">
+        {renderMtmMetric('1h MTM', change1h, isBest1h)}
+        {renderMtmMetric('12h MTM', change12h, isBest12h)}
       </div>
       {showInitialBalances && (
-        <div className="token-balance-details" style={{ marginTop: '0.75rem' }}>
-          <div
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              opacity: 0.7,
-              marginBottom: '0.35rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
-            }}
-          >
-            Initial Balance
-          </div>
+        <div className="token-balance-details mtm-initial-balances">
+          <div className="mtm-initial-balances-title">Initial Balance</div>
           {initialBalances.map(({ label, value }) => (
             <div key={label} className="token-balance-row">
               <span className="token-balance-label">{label}:</span>
@@ -1202,36 +1222,18 @@ export function HomePage() {
 
         {mtm && (
           <div className="mtm-section">
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '2rem 1fr 2rem',
-                alignItems: 'center',
-                marginBottom: '0.75rem'
-              }}
-            >
+            <div className="mtm-section-header">
               <span aria-hidden="true" />
-              <h3 className="mtm-title" style={{ margin: 0, textAlign: 'center' }}>
-                MTM (1h)
-                {(() => {
-                  const total1h = getMtm1hTotal(mtm);
-                  if (total1h == null) return null;
-                  return (
-                    <>
-                      {' '}
-                      <span className={`pnl-value ${total1h >= 0 ? 'positive' : 'negative'}`}>
-                        {total1h >= 0 ? '+' : ''}$
-                        {total1h.toLocaleString('en-US', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </span>
-                    </>
-                  );
-                })()}
-              </h3>
+              <div className="mtm-header-center">
+                <h3 className="mtm-title">MTM</h3>
+                <div className="mtm-totals-grid">
+                  {renderMtmTotalMetric('1h total', getMtmPeriodTotal(mtm, 'change1h'))}
+                  {renderMtmTotalMetric('12h total', getMtmPeriodTotal(mtm, 'change12h'))}
+                </div>
+              </div>
               <button
                 type="button"
+                className="mtm-toggle-btn"
                 onClick={() => setShowMtmInitialBalances((visible) => !visible)}
                 aria-label={
                   showMtmInitialBalances
@@ -1244,21 +1246,6 @@ export function HomePage() {
                     : 'Show initial balances'
                 }
                 aria-pressed={showMtmInitialBalances}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2rem',
-                  height: '2rem',
-                  padding: 0,
-                  border: '1px solid rgba(100, 108, 255, 0.35)',
-                  borderRadius: '8px',
-                  background: showMtmInitialBalances
-                    ? 'rgba(100, 108, 255, 0.2)'
-                    : 'transparent',
-                  color: 'inherit',
-                  cursor: 'pointer'
-                }}
               >
                 <svg
                   width="16"
@@ -1280,15 +1267,18 @@ export function HomePage() {
             </div>
             <div className="wallet-values-grid">
               {(() => {
-                const bestMtm1hKey = getBestMtm1hKey(mtm);
+                const bestMtm1hKey = getBestMtmKey(mtm, 'change1h');
+                const bestMtm12hKey = getBestMtmKey(mtm, 'change12h');
                 return MTM_WALLET_CONFIGS.map(({ key, title, initialBalances }) => {
                   const entry = mtm[key];
                   return renderMtmCard(
                     title,
                     entry?.change1h ?? null,
+                    entry?.change12h ?? null,
                     initialBalances,
                     showMtmInitialBalances,
-                    bestMtm1hKey != null && key === bestMtm1hKey
+                    bestMtm1hKey != null && key === bestMtm1hKey,
+                    bestMtm12hKey != null && key === bestMtm12hKey
                   );
                 });
               })()}
