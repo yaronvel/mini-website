@@ -685,6 +685,89 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
   };
 }
 
+/** Hourly total MTM deltas for the last 24h (25 snapshots → 24 hour-over-hour changes). */
+export async function fetchMtmHourlySeries(bearerToken, basePropAmmWalletAddress) {
+  const baseProvider = getProvider(bearerToken);
+  const mainnetProvider = getMainnetProvider(bearerToken);
+  const baseView = getBaseCircuitBreakerViewOnlyContract(baseProvider);
+  const mainnetView = getMainnetCircuitBreakerViewOnlyContract(mainnetProvider);
+
+  const { blockNumber: baseBlockNow, timestamp: baseTimestampNow } =
+    await getBaseBlockInfo(baseProvider);
+
+  const hourSnapshots = Array.from({ length: 25 }, (_, i) => {
+    const hoursAgo = 24 - i;
+    if (hoursAgo === 0) {
+      return { block: baseBlockNow, hasFullData: true };
+    }
+    return mtmHoursAgoBlock(
+      baseBlockNow,
+      baseTimestampNow,
+      hoursAgo,
+      FIRST_BLOCK
+    );
+  });
+
+  const mainnetBlocks = await Promise.all(
+    hourSnapshots.map((snap) =>
+      snap.hasFullData
+        ? getMainnetBlockAtBaseBlock(baseProvider, snap.block)
+        : Promise.resolve(null)
+    )
+  );
+
+  const snapshots = await Promise.all(
+    hourSnapshots.map(async (snap, idx) => {
+      if (!snap.hasFullData || mainnetBlocks[idx] == null) return null;
+
+      const [propAmm, vt, mainnet, fees] = await Promise.all([
+        readPropAmmMtmAtBlock(
+          'base',
+          baseView,
+          basePropAmmWalletAddress,
+          snap.block
+        ),
+        readVtMtmAtBlock(baseView, snap.block),
+        readMainnetMtmAtBlock(mainnetView, mainnetBlocks[idx]),
+        fetchProtocolFeesSinceJune(baseProvider, snap.block)
+      ]);
+
+      const propAmmAdjusted =
+        propAmm != null && fees != null ? propAmm - fees : null;
+
+      if (propAmmAdjusted == null || vt == null || mainnet == null) {
+        return null;
+      }
+
+      return {
+        propAmm: propAmmAdjusted,
+        vt,
+        mainnet,
+        total: propAmmAdjusted + vt + mainnet
+      };
+    })
+  );
+
+  return Array.from({ length: 24 }, (_, i) => {
+    const prev = snapshots[i];
+    const next = snapshots[i + 1];
+    const delta = (a, b) =>
+      a != null && b != null ? b - a : null;
+
+    return {
+      slot: i,
+      label:
+        i === 23
+          ? '1h ago → now: Δ MTM vs previous hour'
+          : `${24 - i}h → ${24 - i - 1}h ago: Δ MTM vs previous hour`,
+      mtm: delta(prev?.total, next?.total),
+      propAmm: delta(prev?.propAmm, next?.propAmm),
+      vt: delta(prev?.vt, next?.vt),
+      mainnet: delta(prev?.mainnet, next?.mainnet)
+    };
+  });
+}
+
 /** USD value for VT wallet via CircuitBreakerViewOnly.getWalletValue (Base). */
 export async function fetchVtWalletValue(provider) {
   const contract = getWalletValueViewContract(provider);

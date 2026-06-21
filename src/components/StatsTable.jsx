@@ -90,7 +90,7 @@ export function StatsTable({ stats, loading }) {
 
   return (
     <div className="stats-container">
-      <h2>Volume Statistics</h2>
+      <h2>Volume Statistics (only base PropAMM)</h2>
       
       {/* 1 Hour Stats Section */}
       <div className="time-period-section">

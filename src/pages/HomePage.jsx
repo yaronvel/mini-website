@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { StatsTable } from '../components/StatsTable';
 import { PnlHourlyChart } from '../components/PnlHourlyChart';
+import { MtmHourlyChart } from '../components/MtmHourlyChart';
 import { isUbuntuOrXiaomiMobile } from '../utils/clientPlatform';
 import { 
   getProvider, 
@@ -19,6 +20,7 @@ import {
   fetchVtWalletUsdcBalance,
   buildGlobalTokenBalancesSnapshot,
   fetchMtmSnapshot,
+  fetchMtmHourlySeries,
   TOKENS,
   TOKEN_DECIMALS,
   AGGREGATORS,
@@ -403,6 +405,7 @@ export function HomePage() {
   const [mainnetWalletValue, setMainnetWalletValue] = useState(null);
   const [mainnetMinUSDValue, setMainnetMinUSDValue] = useState(null);
   const [mtm, setMtm] = useState(null);
+  const [mtmHourlySeries, setMtmHourlySeries] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [sanityPnl, setSanityPnl] = useState(null);
   const [protocolFees, setProtocolFees] = useState(null);
@@ -615,6 +618,14 @@ export function HomePage() {
       } catch (e) {
         console.warn('MTM fetch failed:', e);
         setMtm(null);
+      }
+
+      try {
+        const mtmHourly = await fetchMtmHourlySeries(bearerToken, walletAddress);
+        setMtmHourlySeries(mtmHourly);
+      } catch (e) {
+        console.warn('MTM hourly series fetch failed:', e);
+        setMtmHourlySeries(null);
       }
 
       // First block timestamp (local so PnL labels can use it in the same fetch)
@@ -1107,7 +1118,7 @@ export function HomePage() {
   return (
     <div className="home-page">
       <header className="app-header">
-        <h1>Base Volume Statistics</h1>
+        <h1>Base Volume Statistics (only base PropAMM)</h1>
         <div className="block-info">
           {currentBlock && (
             <p>Current Block: {currentBlock.toLocaleString()}</p>
@@ -1292,6 +1303,9 @@ export function HomePage() {
                 )
               )}
             </div>
+            {mtmHourlySeries?.some((d) => d.mtm != null) && (
+              <MtmHourlyChart hourlySeries={mtmHourlySeries} />
+            )}
           </div>
         )}
         
@@ -1335,7 +1349,7 @@ export function HomePage() {
         )}
         {pnl !== null && (
           <div className="pnl-card">
-            <h3 className="pnl-title">PnL Statistics</h3>
+            <h3 className="pnl-title">PnL Statistics (only base PropAMM)</h3>
             <div className="token-balances-grid pnl-stats-cubes">
               {pnl.totalSinceFirst !== null && pnl.totalSinceFirst !== undefined && (
                 <div className="token-balance-item">
