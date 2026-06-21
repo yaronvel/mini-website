@@ -1295,6 +1295,14 @@ export function HomePage() {
         {(tokenBalances || mainnetTokenBalances || vtTokenBalances || globalTokenBalances) && (
           <div className="token-balances-card">
             <h3 className="token-balances-title">Token Balances</h3>
+            {globalTokenBalances && (
+              <section className="token-balances-row">
+                <h4 className="token-balances-row-title">Global</h4>
+                <div className="token-balances-grid token-balances-grid--aligned">
+                  {renderGlobalBalanceRow(globalTokenBalances)}
+                </div>
+              </section>
+            )}
             {tokenBalances && (
               <section className="token-balances-row">
                 <h4 className="token-balances-row-title">Base PropAMM</h4>
@@ -1316,14 +1324,6 @@ export function HomePage() {
                 <h4 className="token-balances-row-title">VT wallet</h4>
                 <div className="token-balances-grid token-balances-grid--aligned">
                   {renderVtBalanceRow(vtTokenBalances, hideVtTargetPercentage)}
-                </div>
-              </section>
-            )}
-            {globalTokenBalances && (
-              <section className="token-balances-row">
-                <h4 className="token-balances-row-title">Global</h4>
-                <div className="token-balances-grid token-balances-grid--aligned">
-                  {renderGlobalBalanceRow(globalTokenBalances)}
                 </div>
               </section>
             )}
