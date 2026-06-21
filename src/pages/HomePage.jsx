@@ -1118,7 +1118,7 @@ export function HomePage() {
   return (
     <div className="home-page">
       <header className="app-header">
-        <h1>Base Volume Statistics (only base PropAMM)</h1>
+        <h1>Prop AMM dashboard</h1>
         <div className="block-info">
           {currentBlock && (
             <p>Current Block: {currentBlock.toLocaleString()}</p>
