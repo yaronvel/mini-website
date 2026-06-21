@@ -374,15 +374,91 @@ async function readMtmPnl(
   return null;
 }
 
-export const MAINNET_BLOCK_TIME_SECONDS = 12;
+/** Base L1 block oracle — `number()` returns Ethereum mainnet block at that Base block. */
+export const MAINNET_BLOCK_ORACLE_ADDRESS =
+  '0x4200000000000000000000000000000000000015';
+const MAINNET_BLOCK_ORACLE_ABI = [
+  'function number() public view returns (uint256)'
+];
 
-function mtmHoursAgoBlock(currentBlock, hours, blockTimeSeconds, minBlock = 0) {
-  const blocksPerHour = Math.floor(3600 / blockTimeSeconds);
-  const calculated = currentBlock - blocksPerHour * hours;
+async function getBaseBlockInfo(baseProvider) {
+  const blockNumber = await baseProvider.getBlockNumber();
+  try {
+    const block = await baseProvider.send('eth_getBlockByNumber', [
+      `0x${blockNumber.toString(16)}`,
+      false
+    ]);
+    if (block?.timestamp) {
+      return {
+        blockNumber,
+        timestamp: parseInt(block.timestamp, 16)
+      };
+    }
+  } catch (error) {
+    console.warn('getBaseBlockInfo RPC fallback:', error);
+  }
+  const block = await baseProvider.getBlock(blockNumber);
+  return {
+    blockNumber,
+    timestamp: Number(block.timestamp)
+  };
+}
+
+function mtmBaseBlockAtSecondsAgo(
+  currentBlock,
+  currentTimestamp,
+  secondsAgo,
+  minBlock = 0
+) {
+  const targetTimestamp = currentTimestamp - secondsAgo;
+  const blocksBack = Math.floor(
+    (currentTimestamp - targetTimestamp) / BLOCK_TIME_SECONDS
+  );
+  const calculated = currentBlock - blocksBack;
   return {
     block: Math.max(minBlock, calculated),
     hasFullData: calculated >= minBlock
   };
+}
+
+/** June 18 12:00:00 UTC (noon) — MTM period anchor (2026). */
+export const MTM_JUNE_18_UTC_UNIX = Date.UTC(2026, 5, 18, 12, 0, 0) / 1000;
+
+function mtmBaseBlockAtTimestamp(
+  currentBlock,
+  currentTimestamp,
+  targetTimestamp,
+  minBlock = 0
+) {
+  if (targetTimestamp > currentTimestamp) {
+    return { block: minBlock, hasFullData: false };
+  }
+  const secondsAgo = currentTimestamp - targetTimestamp;
+  return mtmBaseBlockAtSecondsAgo(
+    currentBlock,
+    currentTimestamp,
+    secondsAgo,
+    minBlock
+  );
+}
+
+function mtmHoursAgoBlock(currentBlock, currentTimestamp, hours, minBlock = 0) {
+  return mtmBaseBlockAtSecondsAgo(
+    currentBlock,
+    currentTimestamp,
+    hours * 3600,
+    minBlock
+  );
+}
+
+async function getMainnetBlockAtBaseBlock(baseProvider, baseBlockTag) {
+  const oracle = new ethers.Contract(
+    MAINNET_BLOCK_ORACLE_ADDRESS,
+    MAINNET_BLOCK_ORACLE_ABI,
+    baseProvider
+  );
+  const result = await oracle.number({ blockTag: baseBlockTag });
+  return Number(result);
 }
 
 function mtmPeriodChange(current, previous, hasFullData) {
@@ -439,102 +515,116 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
   const baseView = getBaseCircuitBreakerViewOnlyContract(baseProvider);
   const mainnetView = getMainnetCircuitBreakerViewOnlyContract(mainnetProvider);
 
-  const [baseBlockNow, mainnetBlockNow] = await Promise.all([
-    baseProvider.getBlockNumber(),
-    mainnetProvider.getBlockNumber()
-  ]);
+  const { blockNumber: baseBlockNow, timestamp: baseTimestampNow } =
+    await getBaseBlockInfo(baseProvider);
 
   const baseOneHour = mtmHoursAgoBlock(
     baseBlockNow,
+    baseTimestampNow,
     1,
-    BLOCK_TIME_SECONDS,
-    FIRST_BLOCK
-  );
-  const baseTwelveHours = mtmHoursAgoBlock(
-    baseBlockNow,
-    12,
-    BLOCK_TIME_SECONDS,
     FIRST_BLOCK
   );
   const baseTwentyFourHours = mtmHoursAgoBlock(
     baseBlockNow,
+    baseTimestampNow,
     24,
-    BLOCK_TIME_SECONDS,
     FIRST_BLOCK
   );
-  const mainnetOneHour = mtmHoursAgoBlock(
-    mainnetBlockNow,
-    1,
-    MAINNET_BLOCK_TIME_SECONDS
+  const baseSinceJune18 = mtmBaseBlockAtTimestamp(
+    baseBlockNow,
+    baseTimestampNow,
+    MTM_JUNE_18_UTC_UNIX,
+    FIRST_BLOCK
   );
-  const mainnetTwelveHours = mtmHoursAgoBlock(
+
+  const [
     mainnetBlockNow,
-    12,
-    MAINNET_BLOCK_TIME_SECONDS
-  );
-  const mainnetTwentyFourHours = mtmHoursAgoBlock(
-    mainnetBlockNow,
-    24,
-    MAINNET_BLOCK_TIME_SECONDS
-  );
+    mainnetBlock1h,
+    mainnetBlock24h,
+    mainnetBlockSinceJune18
+  ] = await Promise.all([
+    getMainnetBlockAtBaseBlock(baseProvider, baseBlockNow),
+    baseOneHour.hasFullData
+      ? getMainnetBlockAtBaseBlock(baseProvider, baseOneHour.block)
+      : Promise.resolve(null),
+    baseTwentyFourHours.hasFullData
+      ? getMainnetBlockAtBaseBlock(baseProvider, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSinceJune18.hasFullData
+      ? getMainnetBlockAtBaseBlock(baseProvider, baseSinceJune18.block)
+      : Promise.resolve(null)
+  ]);
+
+  const mainnetOneHour = {
+    block: mainnetBlock1h,
+    hasFullData: baseOneHour.hasFullData && mainnetBlock1h != null
+  };
+  const mainnetTwentyFourHours = {
+    block: mainnetBlock24h,
+    hasFullData: baseTwentyFourHours.hasFullData && mainnetBlock24h != null
+  };
+  const mainnetSinceJune18 = {
+    block: mainnetBlockSinceJune18,
+    hasFullData: baseSinceJune18.hasFullData && mainnetBlockSinceJune18 != null
+  };
 
   const [
     propAmmNow,
     propAmm1h,
-    propAmm12h,
     propAmm24h,
+    propAmmSinceJune18,
     vtNow,
     vt1h,
-    vt12h,
     vt24h,
+    vtSinceJune18,
     mainnetNow,
     mainnet1h,
-    mainnet12h,
     mainnet24h,
+    mainnetSinceJune18Pnl,
     feesNow,
     fees1h,
-    fees12h,
-    fees24h
+    fees24h,
+    feesSinceJune18
   ] = await Promise.all([
     readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseBlockNow),
     baseOneHour.hasFullData
       ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseOneHour.block)
       : Promise.resolve(null),
-    baseTwelveHours.hasFullData
-      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwelveHours.block)
-      : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
       ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSinceJune18.hasFullData
+      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseSinceJune18.block)
       : Promise.resolve(null),
     readVtMtmAtBlock(baseView, baseBlockNow),
     baseOneHour.hasFullData
       ? readVtMtmAtBlock(baseView, baseOneHour.block)
       : Promise.resolve(null),
-    baseTwelveHours.hasFullData
-      ? readVtMtmAtBlock(baseView, baseTwelveHours.block)
-      : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
       ? readVtMtmAtBlock(baseView, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSinceJune18.hasFullData
+      ? readVtMtmAtBlock(baseView, baseSinceJune18.block)
       : Promise.resolve(null),
     readMainnetMtmAtBlock(mainnetView, mainnetBlockNow),
     mainnetOneHour.hasFullData
       ? readMainnetMtmAtBlock(mainnetView, mainnetOneHour.block)
       : Promise.resolve(null),
-    mainnetTwelveHours.hasFullData
-      ? readMainnetMtmAtBlock(mainnetView, mainnetTwelveHours.block)
-      : Promise.resolve(null),
     mainnetTwentyFourHours.hasFullData
       ? readMainnetMtmAtBlock(mainnetView, mainnetTwentyFourHours.block)
+      : Promise.resolve(null),
+    mainnetSinceJune18.hasFullData
+      ? readMainnetMtmAtBlock(mainnetView, mainnetSinceJune18.block)
       : Promise.resolve(null),
     fetchProtocolFeesSinceJune(baseProvider, baseBlockNow),
     baseOneHour.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseOneHour.block)
       : Promise.resolve(null),
-    baseTwelveHours.hasFullData
-      ? fetchProtocolFeesSinceJune(baseProvider, baseTwelveHours.block)
-      : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSinceJune18.hasFullData
+      ? fetchProtocolFeesSinceJune(baseProvider, baseSinceJune18.block)
       : Promise.resolve(null)
   ]);
 
@@ -542,10 +632,12 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     propAmmNow != null ? propAmmNow - feesNow : null;
   const propAmmAdjusted1h =
     propAmm1h != null && fees1h != null ? propAmm1h - fees1h : null;
-  const propAmmAdjusted12h =
-    propAmm12h != null && fees12h != null ? propAmm12h - fees12h : null;
   const propAmmAdjusted24h =
     propAmm24h != null && fees24h != null ? propAmm24h - fees24h : null;
+  const propAmmAdjustedSinceJune18 =
+    propAmmSinceJune18 != null && feesSinceJune18 != null
+      ? propAmmSinceJune18 - feesSinceJune18
+      : null;
 
   return {
     propAmm: {
@@ -555,35 +647,39 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
         propAmmAdjusted1h,
         baseOneHour.hasFullData
       ),
-      change12h: mtmPeriodChange(
-        propAmmAdjustedNow,
-        propAmmAdjusted12h,
-        baseTwelveHours.hasFullData
-      ),
       change24h: mtmPeriodChange(
         propAmmAdjustedNow,
         propAmmAdjusted24h,
         baseTwentyFourHours.hasFullData
+      ),
+      changeSinceJune18: mtmPeriodChange(
+        propAmmAdjustedNow,
+        propAmmAdjustedSinceJune18,
+        baseSinceJune18.hasFullData
       )
     },
     vt: {
       value: vtNow,
       change1h: mtmPeriodChange(vtNow, vt1h, baseOneHour.hasFullData),
-      change12h: mtmPeriodChange(vtNow, vt12h, baseTwelveHours.hasFullData),
-      change24h: mtmPeriodChange(vtNow, vt24h, baseTwentyFourHours.hasFullData)
+      change24h: mtmPeriodChange(vtNow, vt24h, baseTwentyFourHours.hasFullData),
+      changeSinceJune18: mtmPeriodChange(
+        vtNow,
+        vtSinceJune18,
+        baseSinceJune18.hasFullData
+      )
     },
     mainnet: {
       value: mainnetNow,
       change1h: mtmPeriodChange(mainnetNow, mainnet1h, mainnetOneHour.hasFullData),
-      change12h: mtmPeriodChange(
-        mainnetNow,
-        mainnet12h,
-        mainnetTwelveHours.hasFullData
-      ),
       change24h: mtmPeriodChange(
         mainnetNow,
         mainnet24h,
         mainnetTwentyFourHours.hasFullData
+      ),
+      changeSinceJune18: mtmPeriodChange(
+        mainnetNow,
+        mainnetSinceJune18Pnl,
+        mainnetSinceJune18.hasFullData
       )
     }
   };
