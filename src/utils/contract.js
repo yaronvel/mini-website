@@ -260,7 +260,7 @@ export const AGGREGATORS = {
   liquidMeshQA: '0xe5d4b6fa308335350e6b992c8a189eab51b22fae',
   liquidMesh: '0xf5ae73ca5ed58a30886b88e74d0ba1931d315a8c',
   rebalance: '0xe55aDbd4a21616C4A5936B5C7e99bf43afaeb298',
-  bitget: '0xE0D0053d628a29ECE601ddab38662f1a68b34643'
+  bitget: '0x184a53FAe631f477B57E8319c7aedb42d98b8635'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
