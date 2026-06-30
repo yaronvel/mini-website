@@ -259,7 +259,7 @@ export const AGGREGATORS = {
   fibrous: '0x274602a953847d807231d2370072f5f4e4594b44',
   liquidMeshQA: '0xe5d4b6fa308335350e6b992c8a189eab51b22fae',
   liquidMesh: '0xf5ae73ca5ed58a30886b88e74d0ba1931d315a8c',
-  rebalance: '0x8301b8c7a8f6AC40A471f61Fe3D746e3A106c983',
+  rebalance: '0xe55aDbd4a21616C4A5936B5C7e99bf43afaeb298',
   bitget: '0xE0D0053d628a29ECE601ddab38662f1a68b34643'
 };
 
