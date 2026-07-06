@@ -6,15 +6,14 @@ import { isUbuntuOrXiaomiMobile } from '../utils/clientPlatform';
 import { 
   getProvider, 
   getContract, 
-  getTargetBalanceContract,
   getPnLContract,
   getSanityPnlContract,
   fetchProtocolFeesSinceJune,
   fetchGasExpensesTotalSpent,
   fetchVtWalletValue,
   fetchMainnetWalletValue,
-  fetchTokenBalancesSnapshot,
   fetchMainnetTokenBalances,
+  fetchBasePropAmmTokenBalances,
   fetchVtWalletBalances,
   buildVtTokenBalancesSnapshot,
   fetchVtWalletUsdcBalance,
@@ -22,7 +21,6 @@ import {
   fetchMtmSnapshot,
   fetchMtmHourlySeries,
   TOKENS,
-  TOKEN_DECIMALS,
   AGGREGATORS,
   USDC_DIVISOR,
   FIRST_BLOCK,
@@ -115,9 +113,61 @@ const VT_BALANCE_SLOTS = [
   { column: 'usdc', tokenKey: 'usdc' }
 ];
 
+function renderBaseTokenBalanceCube(tokenName, data) {
+  const displayName = tokenBalanceDisplayName(tokenName);
+  return (
+    <div key={tokenName} className="token-balance-item">
+      <div className="token-balance-header">
+        <span className="token-balance-name">{displayName}</span>
+        <span className="token-balance-percentage">{data.percentage.toFixed(2)}%</span>
+      </div>
+      <div className="token-balance-details">
+        <div className="token-balance-row">
+          <span className="token-balance-label">Balance:</span>
+          <span className="token-balance-value">
+            {data.balance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+        {tokenName !== 'usdc' && data.rebalanceOffset != null && (
+          <div className="token-balance-row">
+            <span className="token-balance-label">Rebalance offset:</span>
+            <span className="token-balance-value">
+              {data.rebalanceOffset.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
+              })}
+            </span>
+          </div>
+        )}
+        <div className="token-balance-row">
+          <span className="token-balance-label">Target:</span>
+          <span className="token-balance-value">
+            {data.target.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+      </div>
+      <div className="token-balance-progress-bar">
+        <div
+          className="token-balance-progress-fill"
+          style={{
+            width: `${Math.min(data.percentage, 100)}%`,
+            backgroundColor: progressBarColor(data.percentage)
+          }}
+        ></div>
+      </div>
+    </div>
+  );
+}
+
 function renderBaseBalanceRow(balanceData) {
   return BASE_BALANCE_SLOT_KEYS.map((tokenKey) =>
-    renderTokenBalanceCube(tokenKey, balanceData[tokenKey])
+    renderBaseTokenBalanceCube(tokenKey, balanceData[tokenKey])
   );
 }
 
@@ -544,17 +594,8 @@ export function HomePage() {
         throw error;
       }
       
-      // Get target balance contract
-      const targetBalanceContract = getTargetBalanceContract(provider);
-      
       // Fetch token balances and target balances (Base PropAMM)
-      const balanceData = await fetchTokenBalancesSnapshot(
-        provider,
-        walletAddress,
-        TOKENS,
-        TOKEN_DECIMALS,
-        targetBalanceContract
-      );
+      const balanceData = await fetchBasePropAmmTokenBalances(provider, walletAddress);
       setTokenBalances(balanceData);
 
       let mainnetBalancesData = null;

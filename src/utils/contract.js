@@ -93,7 +93,25 @@ export const TOKEN_DECIMALS = {
 };
 
 // Target balance contract address
-export const TARGET_BALANCE_CONTRACT_ADDRESS = '0xe00B0150bA21625353b69d82b3ec28a9A744B0C7';
+export const TARGET_BALANCE_CONTRACT_ADDRESS = '0x32C42B4b9B636483831B0c99bc776999bD6175A3';
+
+/** Base rebalancer — virtual balance offset per token. */
+export const REBALANCER_CONTRACT_ADDRESS =
+  '0xe55aDbd4a21616C4A5936B5C7e99bf43afaeb298';
+export const REBALANCER_CONTRACT_ABI = [
+  {
+    inputs: [
+      { internalType: 'address', name: 'token', type: 'address' },
+      { internalType: 'uint256', name: 'currTime', type: 'uint256' }
+    ],
+    name: 'getVirtualBalance',
+    outputs: [{ internalType: 'int256', name: '', type: 'int256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+export const REBALANCE_OFFSET_TOKEN_KEYS = ['weth', 'cbbtc', 'virtual'];
 
 export const VT_WALLET_ADDRESS = '0xbeeB9eeE061925cC6d2122F05a4e6536F0FEB000';
 export const WALLET_VALUE_VIEW_CONTRACT_ADDRESS =
@@ -315,6 +333,14 @@ export function getContract(provider) {
 
 export function getTargetBalanceContract(provider) {
   return new ethers.Contract(TARGET_BALANCE_CONTRACT_ADDRESS, TARGET_BALANCE_CONTRACT_ABI, provider);
+}
+
+export function getRebalancerContract(provider) {
+  return new ethers.Contract(
+    REBALANCER_CONTRACT_ADDRESS,
+    REBALANCER_CONTRACT_ABI,
+    provider
+  );
 }
 
 export function getWalletValueViewContract(provider) {
@@ -847,6 +873,39 @@ export async function fetchTokenBalancesSnapshot(
       };
     }
   }
+
+  return balanceData;
+}
+
+/** Base PropAMM balances, targets, and rebalance offsets (non-USDC tokens). */
+export async function fetchBasePropAmmTokenBalances(provider, walletAddress) {
+  const balanceData = await fetchTokenBalancesSnapshot(
+    provider,
+    walletAddress,
+    TOKENS,
+    TOKEN_DECIMALS,
+    getTargetBalanceContract(provider)
+  );
+
+  const block = await provider.getBlock('latest');
+  const currTime = block.timestamp;
+  const rebalancer = getRebalancerContract(provider);
+
+  await Promise.all(
+    REBALANCE_OFFSET_TOKEN_KEYS.map(async (tokenName) => {
+      try {
+        const raw = await rebalancer.getVirtualBalance(TOKENS[tokenName], currTime);
+        const rawBigInt =
+          typeof raw === 'bigint' ? raw : BigInt(raw.toString());
+        const divisor = 10n ** BigInt(TOKEN_DECIMALS[tokenName]);
+        balanceData[tokenName].rebalanceOffset =
+          Number(rawBigInt) / Number(divisor);
+      } catch (error) {
+        console.warn(`Rebalance offset fetch failed for ${tokenName}:`, error);
+        balanceData[tokenName].rebalanceOffset = null;
+      }
+    })
+  );
 
   return balanceData;
 }
