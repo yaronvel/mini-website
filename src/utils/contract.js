@@ -556,6 +556,12 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     24,
     FIRST_BLOCK
   );
+  const baseSevenDays = mtmHoursAgoBlock(
+    baseBlockNow,
+    baseTimestampNow,
+    24 * 7,
+    FIRST_BLOCK
+  );
   const baseSinceJune18 = mtmBaseBlockAtTimestamp(
     baseBlockNow,
     baseTimestampNow,
@@ -567,6 +573,7 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     mainnetBlockNow,
     mainnetBlock1h,
     mainnetBlock24h,
+    mainnetBlock7d,
     mainnetBlockSinceJune18
   ] = await Promise.all([
     getMainnetBlockAtBaseBlock(baseProvider, baseBlockNow),
@@ -575,6 +582,9 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
       : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
       ? getMainnetBlockAtBaseBlock(baseProvider, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSevenDays.hasFullData
+      ? getMainnetBlockAtBaseBlock(baseProvider, baseSevenDays.block)
       : Promise.resolve(null),
     baseSinceJune18.hasFullData
       ? getMainnetBlockAtBaseBlock(baseProvider, baseSinceJune18.block)
@@ -589,6 +599,10 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     block: mainnetBlock24h,
     hasFullData: baseTwentyFourHours.hasFullData && mainnetBlock24h != null
   };
+  const mainnetSevenDays = {
+    block: mainnetBlock7d,
+    hasFullData: baseSevenDays.hasFullData && mainnetBlock7d != null
+  };
   const mainnetSinceJune18 = {
     block: mainnetBlockSinceJune18,
     hasFullData: baseSinceJune18.hasFullData && mainnetBlockSinceJune18 != null
@@ -598,18 +612,22 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     propAmmNow,
     propAmm1h,
     propAmm24h,
+    propAmm7d,
     propAmmSinceJune18,
     vtNow,
     vt1h,
     vt24h,
+    vt7d,
     vtSinceJune18,
     mainnetNow,
     mainnet1h,
     mainnet24h,
+    mainnet7d,
     mainnetSinceJune18Pnl,
     feesNow,
     fees1h,
     fees24h,
+    fees7d,
     feesSinceJune18
   ] = await Promise.all([
     readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseBlockNow),
@@ -618,6 +636,9 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
       : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
       ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSevenDays.hasFullData
+      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseSevenDays.block)
       : Promise.resolve(null),
     baseSinceJune18.hasFullData
       ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseSinceJune18.block)
@@ -629,6 +650,9 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     baseTwentyFourHours.hasFullData
       ? readVtMtmAtBlock(baseView, baseTwentyFourHours.block)
       : Promise.resolve(null),
+    baseSevenDays.hasFullData
+      ? readVtMtmAtBlock(baseView, baseSevenDays.block)
+      : Promise.resolve(null),
     baseSinceJune18.hasFullData
       ? readVtMtmAtBlock(baseView, baseSinceJune18.block)
       : Promise.resolve(null),
@@ -639,6 +663,9 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     mainnetTwentyFourHours.hasFullData
       ? readMainnetMtmAtBlock(mainnetView, mainnetTwentyFourHours.block)
       : Promise.resolve(null),
+    mainnetSevenDays.hasFullData
+      ? readMainnetMtmAtBlock(mainnetView, mainnetSevenDays.block)
+      : Promise.resolve(null),
     mainnetSinceJune18.hasFullData
       ? readMainnetMtmAtBlock(mainnetView, mainnetSinceJune18.block)
       : Promise.resolve(null),
@@ -648,6 +675,9 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
       : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseTwentyFourHours.block)
+      : Promise.resolve(null),
+    baseSevenDays.hasFullData
+      ? fetchProtocolFeesSinceJune(baseProvider, baseSevenDays.block)
       : Promise.resolve(null),
     baseSinceJune18.hasFullData
       ? fetchProtocolFeesSinceJune(baseProvider, baseSinceJune18.block)
@@ -660,6 +690,8 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     propAmm1h != null && fees1h != null ? propAmm1h - fees1h : null;
   const propAmmAdjusted24h =
     propAmm24h != null && fees24h != null ? propAmm24h - fees24h : null;
+  const propAmmAdjusted7d =
+    propAmm7d != null && fees7d != null ? propAmm7d - fees7d : null;
   const propAmmAdjustedSinceJune18 =
     propAmmSinceJune18 != null && feesSinceJune18 != null
       ? propAmmSinceJune18 - feesSinceJune18
@@ -678,6 +710,11 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
         propAmmAdjusted24h,
         baseTwentyFourHours.hasFullData
       ),
+      change7d: mtmPeriodChange(
+        propAmmAdjustedNow,
+        propAmmAdjusted7d,
+        baseSevenDays.hasFullData
+      ),
       changeSinceJune18: mtmPeriodChange(
         propAmmAdjustedNow,
         propAmmAdjustedSinceJune18,
@@ -688,6 +725,7 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
       value: vtNow,
       change1h: mtmPeriodChange(vtNow, vt1h, baseOneHour.hasFullData),
       change24h: mtmPeriodChange(vtNow, vt24h, baseTwentyFourHours.hasFullData),
+      change7d: mtmPeriodChange(vtNow, vt7d, baseSevenDays.hasFullData),
       changeSinceJune18: mtmPeriodChange(
         vtNow,
         vtSinceJune18,
@@ -702,6 +740,7 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
         mainnet24h,
         mainnetTwentyFourHours.hasFullData
       ),
+      change7d: mtmPeriodChange(mainnetNow, mainnet7d, mainnetSevenDays.hasFullData),
       changeSinceJune18: mtmPeriodChange(
         mainnetNow,
         mainnetSinceJune18Pnl,

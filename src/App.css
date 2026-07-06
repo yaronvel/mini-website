@@ -66,9 +66,9 @@
 
 .mtm-totals-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.65rem;
-  max-width: 42rem;
+  max-width: 56rem;
   margin: 0.65rem auto 0;
 }
 
@@ -133,8 +133,8 @@
 
 .mtm-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.55rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
 }
 
 .mtm-metric {

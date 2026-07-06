@@ -278,6 +278,7 @@ const MTM_WALLET_CONFIGS = [
 const MTM_PERIODS = [
   { key: 'change1h', label: '1h MTM', totalLabel: '1h total' },
   { key: 'change24h', label: '24h MTM', totalLabel: '24h total' },
+  { key: 'change7d', label: '7d MTM', totalLabel: '7d total' },
   {
     key: 'changeSinceJune18',
     label: 'Since June 18th',
