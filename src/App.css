@@ -690,6 +690,26 @@
   font-weight: 600;
 }
 
+.robinhood-page .robinhood-metrics-grid {
+  margin-top: 1rem;
+}
+
+.robinhood-status,
+.robinhood-error {
+  text-align: center;
+  margin: 1.5rem 0 0;
+}
+
+.robinhood-error {
+  color: #ef4444;
+}
+
+@media (prefers-color-scheme: light) {
+  .robinhood-error {
+    color: #b91c1c;
+  }
+}
+
 .pnl-hourly-chart-wrap {
   margin-top: 1.25rem;
   width: 100%;

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   readRpcToken,
   writeRpcToken,
@@ -8,6 +9,7 @@ import {
 const RpcTokenContext = createContext(null);
 
 export function RpcTokenProvider({ children }) {
+  const location = useLocation();
   const [bearerToken, setBearerToken] = useState(null);
   const [hydrated, setHydrated] = useState(false);
   const [draftToken, setDraftToken] = useState('');
@@ -36,7 +38,10 @@ export function RpcTokenProvider({ children }) {
     saveToken(draftToken);
   }
 
-  const showPrompt = hydrated && !bearerToken;
+  const showPrompt =
+    hydrated &&
+    !bearerToken &&
+    !location.pathname.replace(/\/$/, '').endsWith('/robinhood');
 
   return (
     <RpcTokenContext.Provider value={{ bearerToken, saveToken, clearToken, hydrated }}>
@@ -69,7 +74,7 @@ export function RpcTokenProvider({ children }) {
           </div>
         </div>
       )}
-      {hydrated && bearerToken ? children : null}
+      {hydrated ? children : null}
     </RpcTokenContext.Provider>
   );
 }
