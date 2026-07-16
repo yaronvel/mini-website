@@ -25,8 +25,10 @@ function getActiveTokens(stats, period, aggregatorNames, tokenNames) {
   );
 }
 
-function tokenDisplayName(tokenName) {
-  return tokenName === 'virtual' ? 'Virtual' : tokenName.toUpperCase();
+function tokenDisplayName(tokenName, tokenLabels = {}) {
+  if (tokenLabels[tokenName]) return tokenLabels[tokenName];
+  if (tokenName === 'virtual') return 'Virtual';
+  return tokenName.toUpperCase();
 }
 
 // Format time period for display
@@ -45,7 +47,16 @@ function formatTimePeriod(timeSinceFirst) {
   }
 }
 
-export function StatsTable({ stats, loading }) {
+export function StatsTable({
+  stats,
+  loading,
+  title = 'Volume Statistics (only base PropAMM)',
+  tokens = TOKENS,
+  aggregators = AGGREGATORS,
+  aggregatorDisplayNames = AGGREGATOR_DISPLAY_NAMES,
+  formatVolumeFn = formatVolume,
+  tokenLabels = {}
+}) {
   // Only show loading on initial load when there's no data yet
   if (loading && !stats) {
     return (
@@ -60,8 +71,8 @@ export function StatsTable({ stats, loading }) {
     return <div className="error">No data available</div>;
   }
 
-  const tokenNames = Object.keys(TOKENS);
-  const aggregatorNames = Object.keys(AGGREGATORS);
+  const tokenNames = Object.keys(tokens);
+  const aggregatorNames = Object.keys(aggregators);
   const activeAggregators1h = getActiveAggregators(
     stats,
     'oneHour',
@@ -90,7 +101,7 @@ export function StatsTable({ stats, loading }) {
 
   return (
     <div className="stats-container">
-      <h2>Volume Statistics (only base PropAMM)</h2>
+      <h2>{title}</h2>
       
       {/* 1 Hour Stats Section */}
       <div className="time-period-section">
@@ -105,7 +116,7 @@ export function StatsTable({ stats, loading }) {
               <tr>
                 <th>Token</th>
                 {activeAggregators1h.map((aggName) => (
-                  <th key={aggName}>{AGGREGATOR_DISPLAY_NAMES[aggName]}</th>
+                  <th key={aggName}>{aggregatorDisplayNames[aggName]}</th>
                 ))}
                 <th>Total</th>
               </tr>
@@ -122,13 +133,13 @@ export function StatsTable({ stats, loading }) {
                   .toString();
                 return (
                   <tr key={tokenName}>
-                    <td className="token-name">{tokenDisplayName(tokenName)}</td>
+                    <td className="token-name">{tokenDisplayName(tokenName, tokenLabels)}</td>
                     {activeAggregators1h.map((aggName) => (
                       <td key={aggName}>
-                        ${formatVolume(tokenStats[aggName]?.oneHour || '0')}
+                        ${formatVolumeFn(tokenStats[aggName]?.oneHour || '0')}
                       </td>
                     ))}
-                    <td className="total-cell">${formatVolume(total1h)}</td>
+                    <td className="total-cell">${formatVolumeFn(total1h)}</td>
                   </tr>
                 );
               })}
@@ -146,7 +157,7 @@ export function StatsTable({ stats, loading }) {
               <tr>
                 <th>Aggregator</th>
                 {activeTokens1h.map((tokenName) => (
-                  <th key={tokenName}>{tokenDisplayName(tokenName)}</th>
+                  <th key={tokenName}>{tokenDisplayName(tokenName, tokenLabels)}</th>
                 ))}
                 <th>Total</th>
               </tr>
@@ -164,13 +175,13 @@ export function StatsTable({ stats, loading }) {
 
                 return (
                   <tr key={aggName}>
-                    <td className="aggregator-name">{AGGREGATOR_DISPLAY_NAMES[aggName]}</td>
+                    <td className="aggregator-name">{aggregatorDisplayNames[aggName]}</td>
                     {activeTokens1h.map((tokenName) => (
                       <td key={tokenName}>
-                        ${formatVolume(aggStats[tokenName]?.oneHour || '0')}
+                        ${formatVolumeFn(aggStats[tokenName]?.oneHour || '0')}
                       </td>
                     ))}
-                    <td className="total-cell">${formatVolume(total1h)}</td>
+                    <td className="total-cell">${formatVolumeFn(total1h)}</td>
                   </tr>
                 );
               })}
@@ -184,7 +195,7 @@ export function StatsTable({ stats, loading }) {
           <div className="totals-card">
             <div className="total-item">
               <span className="total-label">Total Volume (1h):</span>
-              <span className="total-value">${formatVolume(stats.overall?.oneHour || '0')}</span>
+              <span className="total-value">${formatVolumeFn(stats.overall?.oneHour || '0')}</span>
             </div>
           </div>
         </div>
@@ -203,7 +214,7 @@ export function StatsTable({ stats, loading }) {
               <tr>
                 <th>Token</th>
                 {activeAggregators24h.map((aggName) => (
-                  <th key={aggName}>{AGGREGATOR_DISPLAY_NAMES[aggName]}</th>
+                  <th key={aggName}>{aggregatorDisplayNames[aggName]}</th>
                 ))}
                 <th>Total</th>
               </tr>
@@ -220,13 +231,13 @@ export function StatsTable({ stats, loading }) {
                   .toString();
                 return (
                   <tr key={tokenName}>
-                    <td className="token-name">{tokenDisplayName(tokenName)}</td>
+                    <td className="token-name">{tokenDisplayName(tokenName, tokenLabels)}</td>
                     {activeAggregators24h.map((aggName) => (
                       <td key={aggName}>
-                        ${formatVolume(tokenStats[aggName]?.twentyFourHours || '0')}
+                        ${formatVolumeFn(tokenStats[aggName]?.twentyFourHours || '0')}
                       </td>
                     ))}
-                    <td className="total-cell">${formatVolume(total24h)}</td>
+                    <td className="total-cell">${formatVolumeFn(total24h)}</td>
                   </tr>
                 );
               })}
@@ -244,7 +255,7 @@ export function StatsTable({ stats, loading }) {
               <tr>
                 <th>Aggregator</th>
                 {activeTokens24h.map((tokenName) => (
-                  <th key={tokenName}>{tokenDisplayName(tokenName)}</th>
+                  <th key={tokenName}>{tokenDisplayName(tokenName, tokenLabels)}</th>
                 ))}
                 <th>Total</th>
               </tr>
@@ -262,13 +273,13 @@ export function StatsTable({ stats, loading }) {
 
                 return (
                   <tr key={aggName}>
-                    <td className="aggregator-name">{AGGREGATOR_DISPLAY_NAMES[aggName]}</td>
+                    <td className="aggregator-name">{aggregatorDisplayNames[aggName]}</td>
                     {activeTokens24h.map((tokenName) => (
                       <td key={tokenName}>
-                        ${formatVolume(aggStats[tokenName]?.twentyFourHours || '0')}
+                        ${formatVolumeFn(aggStats[tokenName]?.twentyFourHours || '0')}
                       </td>
                     ))}
-                    <td className="total-cell">${formatVolume(total24h)}</td>
+                    <td className="total-cell">${formatVolumeFn(total24h)}</td>
                   </tr>
                 );
               })}
@@ -282,7 +293,7 @@ export function StatsTable({ stats, loading }) {
           <div className="totals-card">
             <div className="total-item">
               <span className="total-label">Total Volume (24h):</span>
-              <span className="total-value">${formatVolume(stats.overall?.twentyFourHours || '0')}</span>
+              <span className="total-value">${formatVolumeFn(stats.overall?.twentyFourHours || '0')}</span>
             </div>
           </div>
         </div>

@@ -3,36 +3,39 @@ import { FIRST_BLOCK, BLOCK_TIME_SECONDS } from './contract.js';
 /**
  * Calculate block numbers for different time periods
  * @param {number} currentBlock - Current block number
- * @param {number} currentTimestamp - Current block timestamp
+ * @param {number} [currentTimestamp] - Current block timestamp (unused, kept for API compat)
+ * @param {{ firstBlock?: number, blockTimeSeconds?: number }} [options]
  * @returns {Object} Object with block numbers and time period info
  */
-export function calculateBlockNumbers(currentBlock, currentTimestamp) {
-  const blocksPerHour = 3600 / BLOCK_TIME_SECONDS; // 1800 blocks per hour
+export function calculateBlockNumbers(currentBlock, currentTimestamp, options = {}) {
+  const firstBlock = options.firstBlock ?? FIRST_BLOCK;
+  const blockTimeSeconds = options.blockTimeSeconds ?? BLOCK_TIME_SECONDS;
+  const blocksPerHour = 3600 / blockTimeSeconds;
   
   // Calculate blocks since first block
-  const blocksSinceFirst = currentBlock - FIRST_BLOCK;
-  const secondsSinceFirst = blocksSinceFirst * BLOCK_TIME_SECONDS;
+  const blocksSinceFirst = currentBlock - firstBlock;
+  const secondsSinceFirst = blocksSinceFirst * blockTimeSeconds;
   const hoursSinceFirst = secondsSinceFirst / 3600;
   const daysSinceFirst = secondsSinceFirst / 86400;
 
   // For 1h stats: calculate the block that's 1 hour ago
   // If that's before the first block, we'll use first block but mark it differently
   const calculated1hAgo = currentBlock - blocksPerHour;
-  const block1hAgo = Math.max(FIRST_BLOCK, calculated1hAgo);
-  const hasFull1hData = calculated1hAgo >= FIRST_BLOCK;
+  const block1hAgo = Math.max(firstBlock, calculated1hAgo);
+  const hasFull1hData = calculated1hAgo >= firstBlock;
   
   // For 24h stats: calculate the block that's 24 hours ago
   // Always use the actual calculated 24h ago block (even if before FIRST_BLOCK)
   const blocksIn24h = blocksPerHour * 24; // 43200 blocks in 24h
   const calculated24hAgo = currentBlock - blocksIn24h;
   const block24hAgoActual = calculated24hAgo; // Use actual 24h ago, not clamped to FIRST_BLOCK
-  const hasFull24hData = calculated24hAgo >= FIRST_BLOCK;
+  const hasFull24hData = calculated24hAgo >= firstBlock;
 
   return {
     current: currentBlock,
     oneHourAgo: block1hAgo,
     twentyFourHoursAgo: block24hAgoActual,
-    first: FIRST_BLOCK,
+    first: firstBlock,
     hasFull1hData: hasFull1hData,
     hasFull24hData: hasFull24hData,
     timeSinceFirst: {

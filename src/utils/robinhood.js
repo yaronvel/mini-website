@@ -1,9 +1,12 @@
 import { ethers } from 'ethers';
 import circuitBreakerAbi from '../data/abis/CircuitBreaker.json';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
+import { calculateBlockNumbers, getCurrentBlockInfo } from './blockUtils.js';
 
 export const ROBINHOOD_RPC_URL = 'https://rpc.mainnet.chain.robinhood.com';
 export const ROBINHOOD_CHAIN_ID = 4663;
+export const ROBINHOOD_BLOCK_TIME_SECONDS = 0.1;
+export const ROBINHOOD_FIRST_BLOCK = 10330897;
 
 export const ROBINHOOD_WALLET_ADDRESS =
   '0xcA9bf993eB00f641F1d4EBf6f334f1Ff04074EF6';
@@ -11,12 +14,36 @@ export const ROBINHOOD_SANITY_PNL_ADDRESS =
   '0x351d0AeF16f04C3730299Da7bf898bFB9d66561E';
 export const ROBINHOOD_CIRCUIT_BREAKER_ADDRESS =
   '0xd218b2B96dA54b7B7170AfF8b99d2DF8BA6d3334';
-export const ROBINHOOD_PNL_ANCHOR_BLOCK = 10330897;
+export const ROBINHOOD_PNL_ANCHOR_BLOCK = ROBINHOOD_FIRST_BLOCK;
 
 export const ROBINHOOD_TOKENS = {
   weth: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
   usdc: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
   virtual: '0xc6911796042b15d7Fa4F6CDe69e245DdCd3d9c31'
+};
+
+export const ROBINHOOD_VOLUME_TOKENS = {
+  weth: ROBINHOOD_TOKENS.weth,
+  usdg: ROBINHOOD_TOKENS.usdc
+};
+
+export const ROBINHOOD_VOLUME_TOKEN_LABELS = {
+  weth: 'WETH',
+  usdg: 'USDG'
+};
+
+export const ROBINHOOD_AGGREGATORS = {
+  normal0x: '0xe72688F7d25D7318B9A81F21EdDa640CA948c83B',
+  router0x: '0x40f06405F89e3Bf84CC78f8a6de02f4c344B9CC2',
+  intent0x: '0x62988e818362b1526Ebb935269212Ed21885Cb59',
+  kyberSwap: '0x8F10B468b06c6FD214B65F87778827F7D113f996'
+};
+
+export const ROBINHOOD_AGGREGATOR_DISPLAY_NAMES = {
+  normal0x: 'normal 0x',
+  router0x: 'router 0x',
+  intent0x: '0x intents',
+  kyberSwap: 'KyberSwap'
 };
 
 export const ROBINHOOD_TOKEN_DECIMALS = {
@@ -231,5 +258,126 @@ export async function fetchRobinhoodSnapshot() {
     pnlAnchorBlock: ROBINHOOD_PNL_ANCHOR_BLOCK,
     totalImbalanceUsd,
     tokens: tokenRows
+  };
+}
+
+async function readRobinhoodVolume(contract, aggAddress, tokenAddress, blockTag, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await contract.volume(aggAddress, tokenAddress, { blockTag });
+    } catch (error) {
+      if (attempt === retries) {
+        console.warn(
+          `Robinhood volume reverted at block ${blockTag} for ${tokenAddress}/${aggAddress}`
+        );
+        return 0n;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+    }
+  }
+  return 0n;
+}
+
+function toVolumeBigInt(value) {
+  return typeof value === 'bigint' ? value : BigInt(value.toString());
+}
+
+/** 1h / 24h volume stats for Robinhood PropAMM (WETH + USDG). */
+export async function fetchRobinhoodVolumeStats() {
+  const provider = getRobinhoodProvider();
+  const contract = new ethers.Contract(
+    ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
+    circuitBreakerAbi,
+    provider
+  );
+
+  const { blockNumber, timestamp } = await getCurrentBlockInfo(provider);
+  const blocks = calculateBlockNumbers(blockNumber, timestamp, {
+    firstBlock: ROBINHOOD_FIRST_BLOCK,
+    blockTimeSeconds: ROBINHOOD_BLOCK_TIME_SECONDS
+  });
+
+  const volumeData = {};
+  for (const [tokenName, tokenAddress] of Object.entries(ROBINHOOD_VOLUME_TOKENS)) {
+    volumeData[tokenName] = {};
+
+    for (const [aggName, aggAddress] of Object.entries(ROBINHOOD_AGGREGATORS)) {
+      const [volumeCurrent, volume1h, volume24h] = await Promise.all([
+        readRobinhoodVolume(contract, aggAddress, tokenAddress, blocks.current),
+        readRobinhoodVolume(contract, aggAddress, tokenAddress, blocks.oneHourAgo),
+        readRobinhoodVolume(
+          contract,
+          aggAddress,
+          tokenAddress,
+          blocks.twentyFourHoursAgo
+        )
+      ]);
+
+      const currentBigInt = toVolumeBigInt(volumeCurrent);
+      const oneHourBigInt = toVolumeBigInt(volume1h);
+      const twentyFourHoursBigInt = toVolumeBigInt(volume24h);
+
+      const oneHourVolume = blocks.hasFull1hData
+        ? currentBigInt - oneHourBigInt
+        : 0n;
+      const twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
+
+      volumeData[tokenName][aggName] = {
+        oneHour: oneHourVolume.toString(),
+        twentyFourHours: twentyFourHoursVolume.toString()
+      };
+    }
+  }
+
+  const perToken = {};
+  const perAggregator = Object.fromEntries(
+    Object.keys(ROBINHOOD_AGGREGATORS).map((key) => [key, {}])
+  );
+
+  for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
+    perToken[tokenName] = {};
+    for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
+      const vol = volumeData[tokenName][aggName] || {
+        oneHour: '0',
+        twentyFourHours: '0'
+      };
+      perToken[tokenName][aggName] = {
+        oneHour: vol.oneHour,
+        twentyFourHours: vol.twentyFourHours
+      };
+    }
+  }
+
+  for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
+    for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
+      const data = volumeData[tokenName][aggName] || {
+        oneHour: '0',
+        twentyFourHours: '0'
+      };
+      perAggregator[aggName][tokenName] = {
+        oneHour: data.oneHour,
+        twentyFourHours: data.twentyFourHours
+      };
+    }
+  }
+
+  let overall1h = 0n;
+  let overall24h = 0n;
+  for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
+    for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
+      const data = volumeData[tokenName][aggName];
+      overall1h += BigInt(data.oneHour);
+      overall24h += BigInt(data.twentyFourHours);
+    }
+  }
+
+  return {
+    perToken,
+    perAggregator,
+    overall: {
+      oneHour: overall1h.toString(),
+      twentyFourHours: overall24h.toString()
+    },
+    timeSinceFirst: blocks.timeSinceFirst
   };
 }

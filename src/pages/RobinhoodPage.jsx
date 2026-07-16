@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { fetchRobinhoodSnapshot } from '../utils/robinhood';
+import { StatsTable } from '../components/StatsTable';
+import {
+  fetchRobinhoodSnapshot,
+  fetchRobinhoodVolumeStats,
+  ROBINHOOD_AGGREGATORS,
+  ROBINHOOD_AGGREGATOR_DISPLAY_NAMES,
+  ROBINHOOD_VOLUME_TOKENS,
+  ROBINHOOD_VOLUME_TOKEN_LABELS
+} from '../utils/robinhood';
 import '../App.css';
 
 const ROBINHOOD_BALANCE_SLOT_KEYS = ['weth', 'virtual', 'usdc'];
@@ -115,6 +123,8 @@ export function RobinhoodPage() {
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [volumeStats, setVolumeStats] = useState(null);
+  const [volumeLoading, setVolumeLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +149,30 @@ export function RobinhoodPage() {
     load();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadVolume() {
+      setVolumeLoading(true);
+      try {
+        const stats = await fetchRobinhoodVolumeStats();
+        if (!cancelled) setVolumeStats(stats);
+      } catch (e) {
+        console.warn('Robinhood volume fetch failed:', e);
+        if (!cancelled) setVolumeStats(null);
+      } finally {
+        if (!cancelled) setVolumeLoading(false);
+      }
+    }
+
+    loadVolume();
+    const interval = setInterval(loadVolume, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
@@ -204,6 +238,16 @@ export function RobinhoodPage() {
           </div>
         </>
       )}
+
+      <StatsTable
+        stats={volumeStats}
+        loading={volumeLoading}
+        title="Volume Statistics (Robinhood)"
+        tokens={ROBINHOOD_VOLUME_TOKENS}
+        aggregators={ROBINHOOD_AGGREGATORS}
+        aggregatorDisplayNames={ROBINHOOD_AGGREGATOR_DISPLAY_NAMES}
+        tokenLabels={ROBINHOOD_VOLUME_TOKEN_LABELS}
+      />
     </div>
   );
 }
