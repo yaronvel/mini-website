@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StatsTable } from '../components/StatsTable';
 import {
   fetchRobinhoodSnapshot,
@@ -121,55 +121,50 @@ function renderRobinhoodBalanceSlot(tokenKey, tokensByKey) {
 
 export function RobinhoodPage() {
   const [snapshot, setSnapshot] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [volumeStats, setVolumeStats] = useState(null);
-  const [volumeLoading, setVolumeLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const hasSnapshotRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      setLoading(true);
-      setError(null);
+    async function refresh() {
       try {
-        const data = await fetchRobinhoodSnapshot();
-        if (!cancelled) setSnapshot(data);
-      } catch (e) {
-        console.warn('Robinhood snapshot fetch failed:', e);
-        if (!cancelled) {
-          setSnapshot(null);
-          setError(e?.message ?? 'Failed to load Robinhood data');
+        const [snapshotResult, volumeResult] = await Promise.allSettled([
+          fetchRobinhoodSnapshot(),
+          fetchRobinhoodVolumeStats()
+        ]);
+
+        if (cancelled) return;
+
+        if (snapshotResult.status === 'fulfilled') {
+          setSnapshot(snapshotResult.value);
+          hasSnapshotRef.current = true;
+          setError(null);
+        } else {
+          console.warn('Robinhood snapshot fetch failed:', snapshotResult.reason);
+          if (!hasSnapshotRef.current) {
+            setError(
+              snapshotResult.reason?.message ?? 'Failed to load Robinhood data'
+            );
+          }
+        }
+
+        if (volumeResult.status === 'fulfilled') {
+          setVolumeStats(volumeResult.value);
+        } else {
+          console.warn('Robinhood volume fetch failed:', volumeResult.reason);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setIsInitialLoad(false);
+        }
       }
     }
 
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadVolume() {
-      setVolumeLoading(true);
-      try {
-        const stats = await fetchRobinhoodVolumeStats();
-        if (!cancelled) setVolumeStats(stats);
-      } catch (e) {
-        console.warn('Robinhood volume fetch failed:', e);
-        if (!cancelled) setVolumeStats(null);
-      } finally {
-        if (!cancelled) setVolumeLoading(false);
-      }
-    }
-
-    loadVolume();
-    const interval = setInterval(loadVolume, 60000);
+    refresh();
+    const interval = setInterval(refresh, 10000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -191,8 +186,10 @@ export function RobinhoodPage() {
         </div>
       </header>
 
-      {loading && <p className="robinhood-status">Loading Robinhood data…</p>}
-      {error && <p className="robinhood-error">{error}</p>}
+      {isInitialLoad && !snapshot && (
+        <p className="robinhood-status">Loading Robinhood data…</p>
+      )}
+      {error && !snapshot && <p className="robinhood-error">{error}</p>}
 
       {snapshot && tokensByKey && (
         <>
@@ -241,7 +238,7 @@ export function RobinhoodPage() {
 
       <StatsTable
         stats={volumeStats}
-        loading={volumeLoading}
+        loading={isInitialLoad && !volumeStats}
         title="Volume Statistics (Robinhood)"
         tokens={ROBINHOOD_VOLUME_TOKENS}
         aggregators={ROBINHOOD_AGGREGATORS}
