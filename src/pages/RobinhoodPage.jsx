@@ -119,6 +119,14 @@ function renderRobinhoodBalanceSlot(tokenKey, tokensByKey) {
   return renderRobinhoodImbalanceCube(row);
 }
 
+function formatMidShift(value) {
+  if (value == null || Number.isNaN(value)) return 'NA';
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4
+  });
+}
+
 export function RobinhoodPage() {
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
@@ -229,6 +237,17 @@ export function RobinhoodPage() {
                     {snapshot.ethDeviationBps != null
                       ? `${snapshot.ethDeviationBps.toLocaleString('en-US')} bps`
                       : 'NA'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="wallet-value-card">
+              <div className="wallet-value-main">
+                <div className="wallet-value-main-left">
+                  <span className="wallet-value-label">propAMM mid shift</span>
+                  <span className="wallet-value-amount">
+                    {formatMidShift(snapshot.propAmmMidShift)}
                   </span>
                 </div>
               </div>

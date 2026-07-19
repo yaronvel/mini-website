@@ -16,6 +16,8 @@ export const ROBINHOOD_CIRCUIT_BREAKER_ADDRESS =
   '0xd218b2B96dA54b7B7170AfF8b99d2DF8BA6d3334';
 export const ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS =
   '0xf12353d20d9Bd21Dc9a83055237B4E9DC39949f5';
+export const ROBINHOOD_PROPAMM_MID_SHIFT_CONTRACT_ADDRESS =
+  '0x7944d66C66a911b6002D581782f202106842Da08';
 export const ROBINHOOD_PNL_ANCHOR_BLOCK = ROBINHOOD_FIRST_BLOCK;
 
 export const ROBINHOOD_TOKENS = {
@@ -76,6 +78,16 @@ const ETH_DEVIATION_ABI = [
     name: 'calcDeviation',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'nonpayable',
+    type: 'function'
+  }
+];
+
+const PROPAMM_MID_SHIFT_ABI = [
+  {
+    inputs: [{ internalType: 'uint256', name: 'currTime', type: 'uint256' }],
+    name: 'getSkew',
+    outputs: [{ internalType: 'int96', name: '', type: 'int96' }],
+    stateMutability: 'view',
     type: 'function'
   }
 ];
@@ -148,6 +160,23 @@ async function readEthDeviationBps(provider) {
   return Number(raw.toString());
 }
 
+function computePropAmmMidShift(skewRaw) {
+  const x = toBigInt(skewRaw);
+  const oneE18 = 10n ** 18n;
+  const oneE4 = 10n ** 4n;
+  return Number(((x - oneE18) * oneE4) / oneE18);
+}
+
+async function readPropAmmMidShift(provider, currTimeSeconds) {
+  const skewContract = new ethers.Contract(
+    ROBINHOOD_PROPAMM_MID_SHIFT_CONTRACT_ADDRESS,
+    PROPAMM_MID_SHIFT_ABI,
+    provider
+  );
+  const skewRaw = await skewContract.getSkew(currTimeSeconds);
+  return computePropAmmMidShift(skewRaw);
+}
+
 async function collectImbalanceTokens(provider, circuitBreaker, sanityContract) {
   const quoteAddress = await circuitBreaker.quoteImpl();
   const quoteContract = new ethers.Contract(
@@ -183,13 +212,24 @@ export async function fetchRobinhoodSnapshot() {
     provider
   );
 
-  const blockNumber = await provider.getBlockNumber();
+  const { blockNumber, timestamp } = await getCurrentBlockInfo(provider);
+  const currTimeSeconds =
+    timestamp && timestamp > 0
+      ? timestamp
+      : Math.floor(Date.now() / 1000);
 
   let ethDeviationBps = null;
   try {
     ethDeviationBps = await readEthDeviationBps(provider);
   } catch (error) {
     console.warn('Robinhood calcDeviation failed:', error);
+  }
+
+  let propAmmMidShift = null;
+  try {
+    propAmmMidShift = await readPropAmmMidShift(provider, currTimeSeconds);
+  } catch (error) {
+    console.warn('Robinhood getSkew failed:', error);
   }
 
   let walletValueUsd = null;
@@ -279,6 +319,7 @@ export async function fetchRobinhoodSnapshot() {
   return {
     blockNumber,
     ethDeviationBps,
+    propAmmMidShift,
     walletValueUsd,
     pnlCurrentUsd,
     pnlChangeUsd:
