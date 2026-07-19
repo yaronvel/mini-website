@@ -14,6 +14,8 @@ export const ROBINHOOD_SANITY_PNL_ADDRESS =
   '0x351d0AeF16f04C3730299Da7bf898bFB9d66561E';
 export const ROBINHOOD_CIRCUIT_BREAKER_ADDRESS =
   '0xd218b2B96dA54b7B7170AfF8b99d2DF8BA6d3334';
+export const ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS =
+  '0xf12353d20d9Bd21Dc9a83055237B4E9DC39949f5';
 export const ROBINHOOD_PNL_ANCHOR_BLOCK = ROBINHOOD_FIRST_BLOCK;
 
 export const ROBINHOOD_TOKENS = {
@@ -64,6 +66,16 @@ const QUOTE_IMPL_ABI = [
     name: 'getListedTokens',
     outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
     stateMutability: 'view',
+    type: 'function'
+  }
+];
+
+const ETH_DEVIATION_ABI = [
+  {
+    inputs: [],
+    name: 'calcDeviation',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
     type: 'function'
   }
 ];
@@ -126,6 +138,16 @@ async function readPnlUsd(sanityContract, blockTag) {
   return scaleInt256ToNumber(raw);
 }
 
+async function readEthDeviationBps(provider) {
+  const deviationContract = new ethers.Contract(
+    ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS,
+    ETH_DEVIATION_ABI,
+    provider
+  );
+  const raw = await deviationContract.calcDeviation.staticCall();
+  return Number(raw.toString());
+}
+
 async function collectImbalanceTokens(provider, circuitBreaker, sanityContract) {
   const quoteAddress = await circuitBreaker.quoteImpl();
   const quoteContract = new ethers.Contract(
@@ -162,6 +184,13 @@ export async function fetchRobinhoodSnapshot() {
   );
 
   const blockNumber = await provider.getBlockNumber();
+
+  let ethDeviationBps = null;
+  try {
+    ethDeviationBps = await readEthDeviationBps(provider);
+  } catch (error) {
+    console.warn('Robinhood calcDeviation failed:', error);
+  }
 
   let walletValueUsd = null;
   try {
@@ -249,6 +278,7 @@ export async function fetchRobinhoodSnapshot() {
 
   return {
     blockNumber,
+    ethDeviationBps,
     walletValueUsd,
     pnlCurrentUsd,
     pnlChangeUsd:
