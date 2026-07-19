@@ -164,7 +164,8 @@ function computePropAmmMidShift(skewRaw) {
   const x = toBigInt(skewRaw);
   const oneE18 = 10n ** 18n;
   const oneE4 = 10n ** 4n;
-  return Number(((x - oneE18) * oneE4) / oneE18);
+  const scaled = ((x - oneE18) * oneE4 * 100n) / oneE18;
+  return Number(scaled) / 100;
 }
 
 async function readPropAmmMidShift(provider, currTimeSeconds) {

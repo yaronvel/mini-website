@@ -123,7 +123,7 @@ function formatMidShift(value) {
   if (value == null || Number.isNaN(value)) return 'NA';
   return value.toLocaleString('en-US', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 4
+    maximumFractionDigits: 2
   });
 }
 
