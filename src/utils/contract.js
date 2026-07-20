@@ -278,7 +278,9 @@ export const AGGREGATORS = {
   liquidMeshQA: '0xe5d4b6fa308335350e6b992c8a189eab51b22fae',
   liquidMesh: '0xf5ae73ca5ed58a30886b88e74d0ba1931d315a8c',
   rebalance: '0xe55aDbd4a21616C4A5936B5C7e99bf43afaeb298',
-  bitget: '0x184a53FAe631f477B57E8319c7aedb42d98b8635'
+  bitget: '0x184a53FAe631f477B57E8319c7aedb42d98b8635',
+  paraSwap1: '0x6a000f20005980200259b80c5102003040001068',
+  paraSwap2: '0x0000000000bbf5c5fd284e657f01bd000933c96d'
 };
 
 export const AGGREGATOR_DISPLAY_NAMES = {
@@ -295,7 +297,9 @@ export const AGGREGATOR_DISPLAY_NAMES = {
   liquidMeshQA: 'LiquidMesh (QA)',
   liquidMesh: 'LiquidMesh',
   rebalance: 'Rebalance',
-  bitget: 'Bitget'
+  bitget: 'Bitget',
+  paraSwap1: 'ParaSwap1',
+  paraSwap2: 'ParaSwap2'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number
