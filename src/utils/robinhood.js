@@ -15,7 +15,7 @@ export const ROBINHOOD_SANITY_PNL_ADDRESS =
 export const ROBINHOOD_CIRCUIT_BREAKER_ADDRESS =
   '0xd218b2B96dA54b7B7170AfF8b99d2DF8BA6d3334';
 export const ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS =
-  '0xf12353d20d9Bd21Dc9a83055237B4E9DC39949f5';
+  '0xcC74c077852676AC11158AB0E2748AED60f6F3Ce';
 export const ROBINHOOD_PROPAMM_MID_SHIFT_CONTRACT_ADDRESS =
   '0x7944d66C66a911b6002D581782f202106842Da08';
 export const ROBINHOOD_PNL_ANCHOR_BLOCK = ROBINHOOD_FIRST_BLOCK;
@@ -76,7 +76,7 @@ const ETH_DEVIATION_ABI = [
   {
     inputs: [],
     name: 'calcDeviation',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    outputs: [{ internalType: 'int256', name: '', type: 'int256' }],
     stateMutability: 'nonpayable',
     type: 'function'
   }
@@ -137,8 +137,18 @@ function toBigInt(value) {
   return typeof value === 'bigint' ? value : BigInt(value.toString());
 }
 
-function scaleInt256ToNumber(raw) {
+/** Decode a 256-bit two's-complement integer (handles negative bps from calcDeviation). */
+function toSignedInt256(raw) {
   const value = toBigInt(raw);
+  const signBit = 1n << 255n;
+  if (value >= signBit) {
+    return value - (1n << 256n);
+  }
+  return value;
+}
+
+function scaleInt256ToNumber(raw) {
+  const value = toSignedInt256(raw);
   const scale = 10n ** 36n;
   const whole = value / scale;
   const fraction = value % scale;
@@ -157,7 +167,7 @@ async function readEthDeviationBps(provider) {
     provider
   );
   const raw = await deviationContract.calcDeviation.staticCall();
-  return Number(raw.toString());
+  return Number(toSignedInt256(raw));
 }
 
 function computePropAmmMidShift(skewRaw) {

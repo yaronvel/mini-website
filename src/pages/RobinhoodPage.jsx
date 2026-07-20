@@ -234,9 +234,7 @@ export function RobinhoodPage() {
                 <div className="wallet-value-main-left">
                   <span className="wallet-value-label">ETH depeg</span>
                   <span className="wallet-value-amount">
-                    {snapshot.ethDeviationBps != null
-                      ? `${snapshot.ethDeviationBps.toLocaleString('en-US')} bps`
-                      : 'NA'}
+                    {formatMidShift(snapshot.ethDeviationBps)}
                   </span>
                 </div>
               </div>
