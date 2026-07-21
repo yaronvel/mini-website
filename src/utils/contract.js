@@ -1086,6 +1086,31 @@ export function buildGlobalTokenBalancesSnapshot(
   };
 }
 
+/** Add Robinhood PropAMM WETH target and USDC balance into the Global row. */
+export function applyRobinhoodWethTargetToGlobal(globalBalances, robinhoodBalances) {
+  if (!globalBalances || !robinhoodBalances) return globalBalances;
+
+  let next = globalBalances;
+
+  if (globalBalances.weth && robinhoodBalances.weth) {
+    const wethTarget = globalBalances.weth.target + robinhoodBalances.weth.target;
+    next = {
+      ...next,
+      weth: tokenBalanceEntry(globalBalances.weth.balance, wethTarget)
+    };
+  }
+
+  if (globalBalances.usdc && robinhoodBalances.usdc) {
+    const usdcBalance = globalBalances.usdc.balance + robinhoodBalances.usdc.balance;
+    next = {
+      ...next,
+      usdc: tokenBalanceEntry(usdcBalance, globalBalances.usdc.target)
+    };
+  }
+
+  return next;
+}
+
 /** Mainnet wallet USD value + circuit breaker min USD threshold. */
 export async function fetchMainnetWalletValue(bearerToken) {
   const provider = getMainnetProvider(bearerToken);

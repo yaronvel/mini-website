@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StatsTable } from '../components/StatsTable';
 import { PnlHourlyChart } from '../components/PnlHourlyChart';
 import { MtmHourlyChart } from '../components/MtmHourlyChart';
@@ -18,6 +18,7 @@ import {
   buildVtTokenBalancesSnapshot,
   fetchVtWalletUsdcBalance,
   buildGlobalTokenBalancesSnapshot,
+  applyRobinhoodWethTargetToGlobal,
   fetchMtmSnapshot,
   fetchMtmHourlySeries,
   TOKENS,
@@ -30,6 +31,12 @@ import {
   BLOCK_TIME_SECONDS
 } from '../utils/contract';
 import { calculateBlockNumbers, getCurrentBlockInfo } from '../utils/blockUtils';
+import {
+  fetchRobinhoodWalletValue,
+  fetchRobinhoodMtmSnapshot,
+  fetchRobinhoodTokenBalances,
+  fetchRobinhoodSanityPnlCircuitBreaker
+} from '../utils/robinhood';
 import { useRpcToken } from '../context/RpcTokenContext';
 import '../App.css';
 
@@ -165,6 +172,54 @@ function renderBaseTokenBalanceCube(tokenName, data) {
   );
 }
 
+/** Robinhood cubes align under Base columns: weth, cbbtc hole, virtual, usdc. */
+const ROBINHOOD_BALANCE_SLOTS = [
+  { column: 'weth', tokenKey: 'weth' },
+  { column: 'cbbtc', tokenKey: null },
+  { column: 'virtual', tokenKey: 'virtual' },
+  { column: 'usdc', tokenKey: 'usdc' }
+];
+
+function renderRobinhoodUsdcBalanceCube(data) {
+  const balance = data?.balance ?? 0;
+  return (
+    <div key="usdc" className="token-balance-item">
+      <div className="token-balance-header">
+        <span className="token-balance-name">USDC</span>
+      </div>
+      <div className="token-balance-details">
+        <div className="token-balance-row">
+          <span className="token-balance-label">Balance:</span>
+          <span className="token-balance-value">
+            {balance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 6
+            })}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderRobinhoodBalanceRow(balanceData) {
+  return ROBINHOOD_BALANCE_SLOTS.map(({ column, tokenKey }) => {
+    if (tokenKey === null) {
+      return (
+        <div
+          key={column}
+          className="token-balance-item token-balance-item--hole"
+          aria-hidden="true"
+        />
+      );
+    }
+    if (tokenKey === 'usdc') {
+      return renderRobinhoodUsdcBalanceCube(balanceData[tokenKey]);
+    }
+    return renderTokenBalanceCube(tokenKey, balanceData[tokenKey]);
+  });
+}
+
 function renderBaseBalanceRow(balanceData) {
   return BASE_BALANCE_SLOT_KEYS.map((tokenKey) =>
     renderBaseTokenBalanceCube(tokenKey, balanceData[tokenKey])
@@ -272,6 +327,11 @@ const MTM_WALLET_CONFIGS = [
       { label: 'WETH', value: 20 },
       { label: 'WBTC', value: 0.5 }
     ]
+  },
+  {
+    key: 'robinhood',
+    title: 'Robinhood PropAMM wallet',
+    initialBalances: []
   }
 ];
 
@@ -293,11 +353,17 @@ function formatMtmInitialBalance(value) {
   });
 }
 
+const MTM_ROBINHOOD_EXCLUDED_PERIODS = new Set(['change7d', 'changeSinceJune18']);
+
 function getBestMtmKey(mtm, periodKey) {
   let bestKey = null;
   let bestValue = -Infinity;
 
   for (const { key } of MTM_WALLET_CONFIGS) {
+    if (mtm[key] == null) continue;
+    if (key === 'robinhood' && MTM_ROBINHOOD_EXCLUDED_PERIODS.has(periodKey)) {
+      continue;
+    }
     const change = mtm[key]?.[periodKey];
     if (change != null && change > bestValue) {
       bestValue = change;
@@ -310,14 +376,20 @@ function getBestMtmKey(mtm, periodKey) {
 
 function getMtmPeriodTotal(mtm, periodKey) {
   let total = 0;
+  let hasAny = false;
 
   for (const { key } of MTM_WALLET_CONFIGS) {
+    if (mtm[key] == null) continue;
+    if (key === 'robinhood' && MTM_ROBINHOOD_EXCLUDED_PERIODS.has(periodKey)) {
+      continue;
+    }
     const change = mtm[key]?.[periodKey];
     if (change == null) return null;
     total += change;
+    hasAny = true;
   }
 
-  return total;
+  return hasAny ? total : null;
 }
 
 function formatMtmUsd(change) {
@@ -437,6 +509,58 @@ function renderGlobalBalanceRow(balanceData) {
   );
 }
 
+function renderPnlCircuitBreakerCard(title, circuitBreaker) {
+  if (!circuitBreaker) return null;
+
+  return (
+    <div className="token-balances-card pnb-circuit-card">
+      <h3 className="token-balances-title">{title}</h3>
+      <div className="token-balances-grid">
+        <div className="token-balance-item">
+          <div className="token-balance-header">
+            <span className="token-balance-name">referencePnl</span>
+          </div>
+          <div
+            className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+              circuitBreaker.referencePnl >= 0 ? 'positive' : 'negative'
+            }`}
+          >
+            {circuitBreaker.referencePnl >= 0 ? '+' : ''}
+            {circuitBreaker.referencePnl.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </div>
+        </div>
+        <div className="token-balance-item">
+          <div className="pnb-circuit-cube-header-column">
+            <span className="token-balance-name">current loss</span>
+            <span className="pnb-circuit-max-allowed">
+              (max allowed{' '}
+              {circuitBreaker.maxAllowedLoss.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
+              })}
+              )
+            </span>
+          </div>
+          <div
+            className={`token-balance-value pnl-value pnb-circuit-cube-value ${
+              circuitBreaker.delta >= 0 ? 'positive' : 'negative'
+            }`}
+          >
+            {circuitBreaker.delta >= 0 ? '+' : ''}
+            {circuitBreaker.delta.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HomePage() {
   const { bearerToken } = useRpcToken();
   const [stats, setStats] = useState(null);
@@ -450,15 +574,19 @@ export function HomePage() {
   const [mainnetTokenBalances, setMainnetTokenBalances] = useState(null);
   const [vtTokenBalances, setVtTokenBalances] = useState(null);
   const [globalTokenBalances, setGlobalTokenBalances] = useState(null);
+  const [robinhoodTokenBalances, setRobinhoodTokenBalances] = useState(null);
   const [hideVtTargetPercentage, setHideVtTargetPercentage] = useState(true);
   const [showMtmInitialBalances, setShowMtmInitialBalances] = useState(false);
   const [vtWalletValue, setVtWalletValue] = useState(null);
   const [mainnetWalletValue, setMainnetWalletValue] = useState(null);
   const [mainnetMinUSDValue, setMainnetMinUSDValue] = useState(null);
+  const [robinhoodWallet, setRobinhoodWallet] = useState(null);
   const [mtm, setMtm] = useState(null);
+  const [robinhoodMtm, setRobinhoodMtm] = useState(null);
   const [mtmHourlySeries, setMtmHourlySeries] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [sanityPnl, setSanityPnl] = useState(null);
+  const [robinhoodSanityPnl, setRobinhoodSanityPnl] = useState(null);
   const [protocolFees, setProtocolFees] = useState(null);
   const [gasExpenses, setGasExpenses] = useState(null);
   const [firstBlockTimestamp, setFirstBlockTimestamp] = useState(null);
@@ -466,6 +594,58 @@ export function HomePage() {
 
   useEffect(() => {
     setHideVtTargetPercentage(!isUbuntuOrXiaomiMobile());
+  }, []);
+
+  const displayMtm = useMemo(() => {
+    if (!mtm && !robinhoodMtm) return null;
+    return {
+      ...mtm,
+      ...(robinhoodMtm ? { robinhood: robinhoodMtm } : {})
+    };
+  }, [mtm, robinhoodMtm]);
+
+  const displayGlobalTokenBalances = useMemo(() => {
+    if (!globalTokenBalances) return null;
+    return applyRobinhoodWethTargetToGlobal(
+      globalTokenBalances,
+      robinhoodTokenBalances
+    );
+  }, [globalTokenBalances, robinhoodTokenBalances]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchRobinhoodHomeData() {
+      try {
+        const [walletSnapshot, robinhoodMtmSnapshot, robinhoodBalances, robinhoodCircuitBreaker] =
+          await Promise.all([
+            fetchRobinhoodWalletValue(),
+            fetchRobinhoodMtmSnapshot(),
+            fetchRobinhoodTokenBalances(),
+            fetchRobinhoodSanityPnlCircuitBreaker()
+          ]);
+        if (cancelled) return;
+        setRobinhoodWallet(walletSnapshot);
+        setRobinhoodMtm(robinhoodMtmSnapshot);
+        setRobinhoodTokenBalances(robinhoodBalances);
+        setRobinhoodSanityPnl(robinhoodCircuitBreaker);
+      } catch (e) {
+        console.warn('Robinhood home fetch failed:', e);
+        if (!cancelled) {
+          setRobinhoodWallet(null);
+          setRobinhoodMtm(null);
+          setRobinhoodTokenBalances(null);
+          setRobinhoodSanityPnl(null);
+        }
+      }
+    }
+
+    fetchRobinhoodHomeData();
+    const interval = setInterval(fetchRobinhoodHomeData, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -1173,7 +1353,10 @@ export function HomePage() {
         </div>
         
         {/* Wallet Value Display */}
-        {(walletValue || vtWalletValue !== null || mainnetWalletValue !== null) && (
+        {(walletValue ||
+          vtWalletValue !== null ||
+          mainnetWalletValue !== null ||
+          robinhoodWallet?.current != null) && (
           <div className="wallet-values-grid">
             {walletValue && (
               <div className="wallet-value-card">
@@ -1284,10 +1467,48 @@ export function HomePage() {
                 )}
               </div>
             )}
+            {robinhoodWallet?.current != null && (
+              <div className="wallet-value-card">
+                <div className="wallet-value-main">
+                  <div className="wallet-value-main-left">
+                    <span className="wallet-value-label">Robinhood PropAMM wallet</span>
+                    <span className="wallet-value-amount">
+                      ${robinhoodWallet.current.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </span>
+                  </div>
+                </div>
+                {robinhoodWallet.minUSDValue != null && (
+                  <div className="wallet-value-minusd-block">
+                    <div className="wallet-value-minusd-text">
+                      <span className="wallet-value-minusd-label">Circuit Breaker Min USD Value</span>
+                      <span className="wallet-value-minusd-amount">
+                        ${robinhoodWallet.minUSDValue.toLocaleString('en-US', {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        })}
+                      </span>
+                    </div>
+                    {robinhoodWallet.current > 0 && (
+                      <div className="wallet-value-minusd-bar">
+                        <div
+                          className="wallet-value-minusd-bar-fill"
+                          style={{
+                            width: `${Math.min((robinhoodWallet.minUSDValue / robinhoodWallet.current) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {mtm && (
+        {displayMtm && (
           <div className="mtm-section">
             <div className="mtm-section-header">
               <span aria-hidden="true" />
@@ -1295,7 +1516,7 @@ export function HomePage() {
                 <h3 className="mtm-title">MTM</h3>
                 <div className="mtm-totals-grid">
                   {MTM_PERIODS.map(({ key, totalLabel }) =>
-                    renderMtmTotalMetric(totalLabel, getMtmPeriodTotal(mtm, key))
+                    renderMtmTotalMetric(totalLabel, getMtmPeriodTotal(displayMtm, key))
                   )}
                 </div>
               </div>
@@ -1334,15 +1555,16 @@ export function HomePage() {
               </button>
             </div>
             <div className="wallet-values-grid">
-              {MTM_WALLET_CONFIGS.map(({ key, title, initialBalances }) =>
-                renderMtmCard(
-                  key,
-                  title,
-                  mtm[key],
-                  initialBalances,
-                  showMtmInitialBalances,
-                  mtm
-                )
+              {MTM_WALLET_CONFIGS.filter(({ key }) => displayMtm[key]).map(
+                ({ key, title, initialBalances }) =>
+                  renderMtmCard(
+                    key,
+                    title,
+                    displayMtm[key],
+                    initialBalances,
+                    showMtmInitialBalances,
+                    displayMtm
+                  )
               )}
             </div>
             {mtmHourlySeries?.some((d) => d.mtm != null) && (
@@ -1352,14 +1574,19 @@ export function HomePage() {
         )}
         
         {/* Token Balances Display */}
-        {(tokenBalances || mainnetTokenBalances || vtTokenBalances || globalTokenBalances) && (
+        {(tokenBalances ||
+          mainnetTokenBalances ||
+          robinhoodTokenBalances ||
+          vtTokenBalances ||
+          globalTokenBalances ||
+          displayGlobalTokenBalances) && (
           <div className="token-balances-card">
             <h3 className="token-balances-title">Token Balances</h3>
-            {globalTokenBalances && (
+            {displayGlobalTokenBalances && (
               <section className="token-balances-row">
                 <h4 className="token-balances-row-title">Global</h4>
                 <div className="token-balances-grid token-balances-grid--aligned">
-                  {renderGlobalBalanceRow(globalTokenBalances)}
+                  {renderGlobalBalanceRow(displayGlobalTokenBalances)}
                 </div>
               </section>
             )}
@@ -1376,6 +1603,14 @@ export function HomePage() {
                 <h4 className="token-balances-row-title">Mainnet PropAMM</h4>
                 <div className="token-balances-grid token-balances-grid--aligned">
                   {renderMainnetBalanceRow(mainnetTokenBalances)}
+                </div>
+              </section>
+            )}
+            {robinhoodTokenBalances && (
+              <section className="token-balances-row">
+                <h4 className="token-balances-row-title">Robinhood PropAMM</h4>
+                <div className="token-balances-grid token-balances-grid--aligned">
+                  {renderRobinhoodBalanceRow(robinhoodTokenBalances)}
                 </div>
               </section>
             )}
@@ -1573,53 +1808,8 @@ export function HomePage() {
           </div>
         )}
 
-        {sanityPnl !== null && (
-          <div className="token-balances-card pnb-circuit-card">
-            <h3 className="token-balances-title">Pnl Circuit Breaker</h3>
-            <div className="token-balances-grid">
-              <div className="token-balance-item">
-                <div className="token-balance-header">
-                  <span className="token-balance-name">referencePnl</span>
-                </div>
-                <div
-                  className={`token-balance-value pnl-value pnb-circuit-cube-value ${
-                    sanityPnl.referencePnl >= 0 ? 'positive' : 'negative'
-                  }`}
-                >
-                  {sanityPnl.referencePnl >= 0 ? '+' : ''}
-                  {sanityPnl.referencePnl.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </div>
-              </div>
-              <div className="token-balance-item">
-                <div className="pnb-circuit-cube-header-column">
-                  <span className="token-balance-name">current loss</span>
-                  <span className="pnb-circuit-max-allowed">
-                    (max allowed{' '}
-                    {sanityPnl.maxAllowedLoss.toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 6
-                    })}
-                    )
-                  </span>
-                </div>
-                <div
-                  className={`token-balance-value pnl-value pnb-circuit-cube-value ${
-                    sanityPnl.delta >= 0 ? 'positive' : 'negative'
-                  }`}
-                >
-                  {sanityPnl.delta >= 0 ? '+' : ''}
-                  {sanityPnl.delta.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {renderPnlCircuitBreakerCard('Pnl Circuit Breaker (Base)', sanityPnl)}
+        {renderPnlCircuitBreakerCard('Pnl Circuit Breaker (Robinhood)', robinhoodSanityPnl)}
       </header>
 
       {error && (

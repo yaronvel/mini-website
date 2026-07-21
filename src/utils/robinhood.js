@@ -160,6 +160,154 @@ async function readPnlUsd(sanityContract, blockTag) {
   return scaleInt256ToNumber(raw);
 }
 
+function robinhoodBlockAtSecondsAgo(
+  currentBlock,
+  secondsAgo,
+  minBlock = ROBINHOOD_FIRST_BLOCK
+) {
+  const blocksBack = Math.floor(secondsAgo / ROBINHOOD_BLOCK_TIME_SECONDS);
+  const calculated = currentBlock - blocksBack;
+  return {
+    block: Math.max(minBlock, calculated),
+    hasFullData: calculated >= minBlock
+  };
+}
+
+function robinhoodHoursAgoBlock(currentBlock, hours, minBlock = ROBINHOOD_FIRST_BLOCK) {
+  return robinhoodBlockAtSecondsAgo(currentBlock, hours * 3600, minBlock);
+}
+
+function robinhoodMtmPeriodChange(current, previous, hasFullData) {
+  return current != null && previous != null && hasFullData
+    ? current - previous
+    : null;
+}
+
+/** Current Robinhood PropAMM wallet value + circuit breaker min USD threshold. */
+export async function fetchRobinhoodWalletValue() {
+  const provider = getRobinhoodProvider();
+  const circuitBreaker = new ethers.Contract(
+    ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
+    circuitBreakerAbi,
+    provider
+  );
+  const [valueRaw, minUsdRaw] = await Promise.all([
+    circuitBreaker.getWalletValue(),
+    circuitBreaker.minUSDValue()
+  ]);
+  const current = Number(valueRaw?.toString?.() ?? valueRaw);
+  const minUSDValue = Number(minUsdRaw?.toString?.() ?? minUsdRaw);
+  return {
+    current: Number.isFinite(current) ? current : null,
+    minUSDValue: Number.isFinite(minUSDValue) ? minUSDValue : null
+  };
+}
+
+/** MTM-style PnL deltas from SanityPnl `pnl()` on Robinhood chain. */
+export async function fetchRobinhoodMtmSnapshot() {
+  const provider = getRobinhoodProvider();
+  const sanityContract = new ethers.Contract(
+    ROBINHOOD_SANITY_PNL_ADDRESS,
+    sanityPnlAbi,
+    provider
+  );
+
+  const { blockNumber } = await getCurrentBlockInfo(provider);
+  const minBlock = ROBINHOOD_FIRST_BLOCK;
+
+  const oneHour = robinhoodHoursAgoBlock(blockNumber, 1, minBlock);
+  const twentyFourHours = robinhoodHoursAgoBlock(blockNumber, 24, minBlock);
+
+  const [pnlNow, pnl1h, pnl24h] = await Promise.all([
+    readPnlUsd(sanityContract, blockNumber),
+    oneHour.hasFullData
+      ? readPnlUsd(sanityContract, oneHour.block)
+      : Promise.resolve(null),
+    twentyFourHours.hasFullData
+      ? readPnlUsd(sanityContract, twentyFourHours.block)
+      : Promise.resolve(null)
+  ]);
+
+  return {
+    value: pnlNow,
+    change1h: robinhoodMtmPeriodChange(pnlNow, pnl1h, oneHour.hasFullData),
+    change24h: robinhoodMtmPeriodChange(
+      pnlNow,
+      pnl24h,
+      twentyFourHours.hasFullData
+    ),
+    change7d: null,
+    changeSinceJune18: null
+  };
+}
+
+/** Robinhood PropAMM wallet balances vs SanityPnl targets (WETH, Virtual, USDC). */
+export async function fetchRobinhoodTokenBalances() {
+  const provider = getRobinhoodProvider();
+  const sanityContract = new ethers.Contract(
+    ROBINHOOD_SANITY_PNL_ADDRESS,
+    sanityPnlAbi,
+    provider
+  );
+
+  const balanceData = {};
+
+  for (const [key, tokenAddress] of Object.entries(ROBINHOOD_TOKENS)) {
+    try {
+      const decimals = ROBINHOOD_TOKEN_DECIMALS[key];
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+      const [balanceRaw, targetRaw] = await Promise.all([
+        tokenContract.balanceOf(ROBINHOOD_WALLET_ADDRESS),
+        sanityContract.targets(tokenAddress)
+      ]);
+
+      const balanceBig = toBigInt(balanceRaw);
+      const targetBig = toBigInt(targetRaw);
+      const divisor = 10n ** BigInt(decimals);
+      const balance = Number(balanceBig) / Number(divisor);
+      const target = Number(targetBig) / Number(divisor);
+
+      balanceData[key] = {
+        balance,
+        target,
+        percentage: target > 0 ? (balance / target) * 100 : 0
+      };
+    } catch (error) {
+      console.warn(`Robinhood token balance fetch failed for ${key}:`, error);
+      balanceData[key] = { balance: 0, target: 0, percentage: 0 };
+    }
+  }
+
+  return balanceData;
+}
+
+/** PnL circuit breaker snapshot from Robinhood SanityPnl (referencePnl, maxLoss, current loss). */
+export async function fetchRobinhoodSanityPnlCircuitBreaker() {
+  const provider = getRobinhoodProvider();
+  const sanityContract = new ethers.Contract(
+    ROBINHOOD_SANITY_PNL_ADDRESS,
+    sanityPnlAbi,
+    provider
+  );
+  const pnlFn = sanityContract.getFunction('pnl()');
+  const [referenceRaw, maxLossRaw, pnlRaw] = await Promise.all([
+    sanityContract.referencePnl(),
+    sanityContract.maxLoss(),
+    pnlFn()
+  ]);
+
+  const referencePnl = scaleInt256ToNumber(referenceRaw);
+  const currentPnl = scaleInt256ToNumber(pnlRaw);
+  const maxB = toBigInt(maxLossRaw);
+  const scale = 1e36;
+
+  return {
+    referencePnl,
+    maxAllowedLoss: Number(maxB) / scale,
+    delta: currentPnl - referencePnl
+  };
+}
+
 async function readEthDeviationBps(provider) {
   const deviationContract = new ethers.Contract(
     ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS,
