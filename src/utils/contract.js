@@ -182,6 +182,15 @@ export const VT_MTM_TARGETS = [
 
 export const VT_MTM_USDC_TARGET = ethers.parseUnits('200000', TOKEN_DECIMALS.usdc);
 
+/** Global WETH target includes 50 ETH VT fixed allocation + 40 ETH extra. */
+export const GLOBAL_WETH_VT_TARGET_ETH = 90;
+
+/** From this Base block onward, VT MTM subtracts {@link VT_MTM_WETH_EXCLUSION_ETH} WETH (USD). */
+export const VT_MTM_WETH_EXCLUSION_START_BLOCK = 48923934;
+export const VT_MTM_WETH_EXCLUSION_ETH = 40;
+
+const MTM_USD_SCALE = 1e36;
+
 /** Base-chain tokens tracked in the VT wallet balances row. */
 export const VT_BALANCE_TOKENS = {
   weth: TOKENS.weth,
@@ -514,8 +523,36 @@ async function readPropAmmMtmAtBlock(
   );
 }
 
-async function readVtMtmAtBlock(baseView, blockTag) {
-  return readMtmPnl(
+async function resolveBlockNumber(provider, blockTag) {
+  if (blockTag === 'latest') {
+    return provider.getBlockNumber();
+  }
+  if (typeof blockTag === 'number') {
+    return blockTag;
+  }
+  if (typeof blockTag === 'bigint') {
+    return Number(blockTag);
+  }
+  if (typeof blockTag === 'string' && blockTag.startsWith('0x')) {
+    return parseInt(blockTag, 16);
+  }
+  return Number(blockTag);
+}
+
+async function readVtWethExclusionUsd(provider, blockTag) {
+  const sanityContract = getSanityPnlContract(provider);
+  const wethAmount = ethers.parseUnits(
+    String(VT_MTM_WETH_EXCLUSION_ETH),
+    TOKEN_DECIMALS.weth
+  );
+  const usdRaw = await sanityContract.getUSDValue(TOKENS.weth, wethAmount, {
+    blockTag
+  });
+  return Number(BigInt(usdRaw.toString())) / MTM_USD_SCALE;
+}
+
+async function readVtMtmAtBlock(baseView, blockTag, baseProvider) {
+  const raw = await readMtmPnl(
     'base',
     baseView,
     VT_WALLET_ADDRESS,
@@ -524,6 +561,20 @@ async function readVtMtmAtBlock(baseView, blockTag) {
     VT_MTM_USDC_TARGET,
     blockTag
   );
+  if (raw == null) return null;
+
+  const blockNumber = await resolveBlockNumber(baseProvider, blockTag);
+  if (blockNumber < VT_MTM_WETH_EXCLUSION_START_BLOCK) {
+    return raw;
+  }
+
+  try {
+    const exclusionUsd = await readVtWethExclusionUsd(baseProvider, blockTag);
+    return raw - exclusionUsd;
+  } catch (error) {
+    console.warn('VT MTM WETH exclusion fetch failed:', error);
+    return raw;
+  }
 }
 
 async function readMainnetMtmAtBlock(mainnetView, blockTag) {
@@ -647,18 +698,18 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     baseSinceJune18.hasFullData
       ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseSinceJune18.block)
       : Promise.resolve(null),
-    readVtMtmAtBlock(baseView, baseBlockNow),
+    readVtMtmAtBlock(baseView, baseBlockNow, baseProvider),
     baseOneHour.hasFullData
-      ? readVtMtmAtBlock(baseView, baseOneHour.block)
+      ? readVtMtmAtBlock(baseView, baseOneHour.block, baseProvider)
       : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
-      ? readVtMtmAtBlock(baseView, baseTwentyFourHours.block)
+      ? readVtMtmAtBlock(baseView, baseTwentyFourHours.block, baseProvider)
       : Promise.resolve(null),
     baseSevenDays.hasFullData
-      ? readVtMtmAtBlock(baseView, baseSevenDays.block)
+      ? readVtMtmAtBlock(baseView, baseSevenDays.block, baseProvider)
       : Promise.resolve(null),
     baseSinceJune18.hasFullData
-      ? readVtMtmAtBlock(baseView, baseSinceJune18.block)
+      ? readVtMtmAtBlock(baseView, baseSinceJune18.block, baseProvider)
       : Promise.resolve(null),
     readMainnetMtmAtBlock(mainnetView, mainnetBlockNow),
     mainnetOneHour.hasFullData
@@ -796,7 +847,7 @@ export async function fetchMtmHourlySeries(bearerToken, basePropAmmWalletAddress
           basePropAmmWalletAddress,
           snap.block
         ),
-        readVtMtmAtBlock(baseView, snap.block),
+        readVtMtmAtBlock(baseView, snap.block, baseProvider),
         readMainnetMtmAtBlock(mainnetView, mainnetBlocks[idx]),
         fetchProtocolFeesSinceJune(baseProvider, snap.block)
       ]);
@@ -1063,7 +1114,9 @@ export function buildGlobalTokenBalancesSnapshot(
     mainnetBalances.weth.balance +
     vtBalances.weth.balance;
   const wethTarget =
-    baseBalances.weth.target + mainnetBalances.weth.target + 50;
+    baseBalances.weth.target +
+    mainnetBalances.weth.target +
+    GLOBAL_WETH_VT_TARGET_ETH;
 
   const btcBalance =
     baseBalances.cbbtc.balance +
