@@ -1042,7 +1042,7 @@ function tokenBalanceEntry(balance, target) {
 }
 
 export const VT_FIXED_TARGETS = {
-  weth: 50,
+  weth: GLOBAL_WETH_VT_TARGET_ETH,
   cbbtc: 1.1,
   virtual: 4744,
   usdc: 0
@@ -1066,7 +1066,7 @@ export function buildVtTokenBalancesSnapshot(
   vtUsdcBalance
 ) {
   const wethTarget =
-    50 +
+    GLOBAL_WETH_VT_TARGET_ETH +
     baseBalances.weth.target +
     mainnetBalances.weth.target -
     baseBalances.weth.balance -
