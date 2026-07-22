@@ -1139,17 +1139,18 @@ export function buildGlobalTokenBalancesSnapshot(
   };
 }
 
-/** Add Robinhood PropAMM WETH target and USDC balance into the Global row. */
+/** Add Robinhood PropAMM WETH/USDC balances and WETH target into the Global row. */
 export function applyRobinhoodWethTargetToGlobal(globalBalances, robinhoodBalances) {
   if (!globalBalances || !robinhoodBalances) return globalBalances;
 
   let next = globalBalances;
 
   if (globalBalances.weth && robinhoodBalances.weth) {
+    const wethBalance = globalBalances.weth.balance + robinhoodBalances.weth.balance;
     const wethTarget = globalBalances.weth.target + robinhoodBalances.weth.target;
     next = {
       ...next,
-      weth: tokenBalanceEntry(globalBalances.weth.balance, wethTarget)
+      weth: tokenBalanceEntry(wethBalance, wethTarget)
     };
   }
 
