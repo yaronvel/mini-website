@@ -353,7 +353,7 @@ function formatMtmInitialBalance(value) {
   });
 }
 
-const MTM_ROBINHOOD_EXCLUDED_PERIODS = new Set(['change7d', 'changeSinceJune18']);
+const MTM_ROBINHOOD_EXCLUDED_PERIODS = new Set(['changeSinceJune18']);
 
 function getBestMtmKey(mtm, periodKey) {
   let bestKey = null;
@@ -562,7 +562,7 @@ function renderPnlCircuitBreakerCard(title, circuitBreaker) {
 }
 
 export function HomePage() {
-  const { bearerToken } = useRpcToken();
+  const { bearerToken, hydrated } = useRpcToken();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -573,6 +573,7 @@ export function HomePage() {
   const [tokenBalances, setTokenBalances] = useState(null);
   const [mainnetTokenBalances, setMainnetTokenBalances] = useState(null);
   const [vtTokenBalances, setVtTokenBalances] = useState(null);
+  const [vtWalletInputs, setVtWalletInputs] = useState(null);
   const [globalTokenBalances, setGlobalTokenBalances] = useState(null);
   const [robinhoodTokenBalances, setRobinhoodTokenBalances] = useState(null);
   const [hideVtTargetPercentage, setHideVtTargetPercentage] = useState(true);
@@ -612,23 +613,36 @@ export function HomePage() {
     );
   }, [globalTokenBalances, robinhoodTokenBalances]);
 
+  const displayVtTokenBalances = useMemo(() => {
+    if (!vtWalletInputs || !displayGlobalTokenBalances) {
+      return vtTokenBalances;
+    }
+    return buildVtTokenBalancesSnapshot(
+      vtWalletInputs.vtBalances,
+      vtWalletInputs.vtUsdcBalance,
+      displayGlobalTokenBalances
+    );
+  }, [vtWalletInputs, displayGlobalTokenBalances, vtTokenBalances]);
+
   useEffect(() => {
+    if (!hydrated) return;
+
     let cancelled = false;
 
     async function fetchRobinhoodHomeData() {
       try {
         const [walletSnapshot, robinhoodMtmSnapshot, robinhoodBalances, robinhoodCircuitBreaker] =
           await Promise.all([
-            fetchRobinhoodWalletValue(),
-            fetchRobinhoodMtmSnapshot(),
-            fetchRobinhoodTokenBalances(),
-            fetchRobinhoodSanityPnlCircuitBreaker()
+            fetchRobinhoodWalletValue(bearerToken),
+            fetchRobinhoodMtmSnapshot(bearerToken),
+            fetchRobinhoodTokenBalances(bearerToken),
+            fetchRobinhoodSanityPnlCircuitBreaker(bearerToken)
           ]);
         if (cancelled) return;
-        setRobinhoodWallet(walletSnapshot);
-        setRobinhoodMtm(robinhoodMtmSnapshot);
+        setRobinhoodWallet(walletSnapshot.error ? null : walletSnapshot);
+        setRobinhoodMtm(robinhoodMtmSnapshot.error ? null : robinhoodMtmSnapshot);
         setRobinhoodTokenBalances(robinhoodBalances);
-        setRobinhoodSanityPnl(robinhoodCircuitBreaker);
+        setRobinhoodSanityPnl(robinhoodCircuitBreaker.error ? null : robinhoodCircuitBreaker);
       } catch (e) {
         console.warn('Robinhood home fetch failed:', e);
         if (!cancelled) {
@@ -646,7 +660,7 @@ export function HomePage() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [bearerToken, hydrated]);
 
   useEffect(() => {
     if (!bearerToken) return;
@@ -792,26 +806,33 @@ export function HomePage() {
         if (mainnetBalancesData) {
           const vtBalances = await fetchVtWalletBalances(provider);
           const vtUsdcBalance = await fetchVtWalletUsdcBalance(provider);
-          const vtSnapshot = buildVtTokenBalancesSnapshot(
+          setVtWalletInputs({ vtBalances, vtUsdcBalance });
+          const vtForGlobal = {
+            weth: { balance: vtBalances.weth },
+            cbbtc: { balance: vtBalances.cbbtc },
+            virtual: { balance: vtBalances.virtual },
+            usdc: { balance: vtUsdcBalance }
+          };
+          const globalSnapshot = buildGlobalTokenBalancesSnapshot(
             balanceData,
             mainnetBalancesData,
+            vtForGlobal
+          );
+          const vtSnapshot = buildVtTokenBalancesSnapshot(
             vtBalances,
-            vtUsdcBalance
+            vtUsdcBalance,
+            globalSnapshot
           );
           setVtTokenBalances(vtSnapshot);
-          setGlobalTokenBalances(
-            buildGlobalTokenBalancesSnapshot(
-              balanceData,
-              mainnetBalancesData,
-              vtSnapshot
-            )
-          );
+          setGlobalTokenBalances(globalSnapshot);
         } else {
+          setVtWalletInputs(null);
           setVtTokenBalances(null);
           setGlobalTokenBalances(null);
         }
       } catch (e) {
         console.warn('VT wallet token balances fetch failed:', e);
+        setVtWalletInputs(null);
         setVtTokenBalances(null);
         setGlobalTokenBalances(null);
       }
@@ -1577,7 +1598,7 @@ export function HomePage() {
         {(tokenBalances ||
           mainnetTokenBalances ||
           robinhoodTokenBalances ||
-          vtTokenBalances ||
+          displayVtTokenBalances ||
           globalTokenBalances ||
           displayGlobalTokenBalances) && (
           <div className="token-balances-card">
@@ -1614,11 +1635,11 @@ export function HomePage() {
                 </div>
               </section>
             )}
-            {vtTokenBalances && (
+            {displayVtTokenBalances && (
               <section className="token-balances-row">
                 <h4 className="token-balances-row-title">VT wallet</h4>
                 <div className="token-balances-grid token-balances-grid--aligned">
-                  {renderVtBalanceRow(vtTokenBalances, hideVtTargetPercentage)}
+                  {renderVtBalanceRow(displayVtTokenBalances, hideVtTargetPercentage)}
                 </div>
               </section>
             )}

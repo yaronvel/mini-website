@@ -1058,39 +1058,32 @@ function vtTokenBalanceEntry(balance, desiredBalance, fixedTarget) {
   };
 }
 
-/** VT wallet targets from Base + Mainnet PropAMM balances and targets. */
-export function buildVtTokenBalancesSnapshot(
-  baseBalances,
-  mainnetBalances,
-  vtBalances,
-  vtUsdcBalance
-) {
-  const wethTarget =
-    GLOBAL_WETH_VT_TARGET_ETH +
-    baseBalances.weth.target +
-    mainnetBalances.weth.target -
-    baseBalances.weth.balance -
-    mainnetBalances.weth.balance;
-
-  const cbbtcTarget =
-    1.1 +
-    baseBalances.cbbtc.target +
-    mainnetBalances.wbtc.target -
-    baseBalances.cbbtc.balance -
-    mainnetBalances.wbtc.balance;
-
-  const virtualTarget =
-    4744 + baseBalances.virtual.target - baseBalances.virtual.balance;
+/** VT desired balance = vt balance + global target - global balance. */
+export function buildVtTokenBalancesSnapshot(vtBalances, vtUsdcBalance, globalBalances) {
+  const desiredBalance = (vtBalance, globalToken) =>
+    vtBalance + globalToken.target - globalToken.balance;
 
   return {
-    weth: vtTokenBalanceEntry(vtBalances.weth, wethTarget, VT_FIXED_TARGETS.weth),
-    cbbtc: vtTokenBalanceEntry(vtBalances.cbbtc, cbbtcTarget, VT_FIXED_TARGETS.cbbtc),
+    weth: vtTokenBalanceEntry(
+      vtBalances.weth,
+      desiredBalance(vtBalances.weth, globalBalances.weth),
+      VT_FIXED_TARGETS.weth
+    ),
+    cbbtc: vtTokenBalanceEntry(
+      vtBalances.cbbtc,
+      desiredBalance(vtBalances.cbbtc, globalBalances.cbbtc),
+      VT_FIXED_TARGETS.cbbtc
+    ),
     virtual: vtTokenBalanceEntry(
       vtBalances.virtual,
-      virtualTarget,
+      desiredBalance(vtBalances.virtual, globalBalances.virtual),
       VT_FIXED_TARGETS.virtual
     ),
-    usdc: vtTokenBalanceEntry(vtUsdcBalance, 0, VT_FIXED_TARGETS.usdc)
+    usdc: vtTokenBalanceEntry(
+      vtUsdcBalance,
+      desiredBalance(vtUsdcBalance, globalBalances.usdc),
+      VT_FIXED_TARGETS.usdc
+    )
   };
 }
 
@@ -1139,27 +1132,18 @@ export function buildGlobalTokenBalancesSnapshot(
   };
 }
 
-/** Add Robinhood PropAMM WETH/USDC balances and WETH target into the Global row. */
+/** Add Robinhood PropAMM balances into the Global row (targets already in global fixed targets). */
 export function applyRobinhoodWethTargetToGlobal(globalBalances, robinhoodBalances) {
   if (!globalBalances || !robinhoodBalances) return globalBalances;
 
-  let next = globalBalances;
+  let next = { ...globalBalances };
 
-  if (globalBalances.weth && robinhoodBalances.weth) {
-    const wethBalance = globalBalances.weth.balance + robinhoodBalances.weth.balance;
-    const wethTarget = globalBalances.weth.target + robinhoodBalances.weth.target;
-    next = {
-      ...next,
-      weth: tokenBalanceEntry(wethBalance, wethTarget)
-    };
-  }
-
-  if (globalBalances.usdc && robinhoodBalances.usdc) {
-    const usdcBalance = globalBalances.usdc.balance + robinhoodBalances.usdc.balance;
-    next = {
-      ...next,
-      usdc: tokenBalanceEntry(usdcBalance, globalBalances.usdc.target)
-    };
+  for (const key of ['weth', 'virtual', 'usdc']) {
+    if (!globalBalances[key] || !robinhoodBalances[key]) continue;
+    next[key] = tokenBalanceEntry(
+      globalBalances[key].balance + robinhoodBalances[key].balance,
+      globalBalances[key].target
+    );
   }
 
   return next;

@@ -1,9 +1,10 @@
-import { ethers } from 'ethers';
+import { ethers, FetchRequest } from 'ethers';
 import circuitBreakerAbi from '../data/abis/CircuitBreaker.json';
 import sanityPnlAbi from '../data/abis/SanityPnl.json';
 import { calculateBlockNumbers, getCurrentBlockInfo } from './blockUtils.js';
 
-export const ROBINHOOD_RPC_URL = 'https://rpc.mainnet.chain.robinhood.com';
+export const ROBINHOOD_PUBLIC_RPC_URL = 'https://rpc.mainnet.chain.robinhood.com';
+export const ROBINHOOD_1INCH_RPC_URL = 'https://api.1inch.com/web3/4663/archive';
 export const ROBINHOOD_CHAIN_ID = 4663;
 export const ROBINHOOD_BLOCK_TIME_SECONDS = 0.1;
 export const ROBINHOOD_FIRST_BLOCK = 10330897;
@@ -85,16 +86,66 @@ const ERC20_ABI = [
   }
 ];
 
-let robinhoodProviderSingleton = null;
+function formatRobinhoodError(error, label) {
+  const detail =
+    error?.shortMessage ?? error?.info?.error?.message ?? error?.message ?? String(error);
+  return label ? `${label}: ${detail}` : detail;
+}
 
-export function getRobinhoodProvider() {
-  if (!robinhoodProviderSingleton) {
-    robinhoodProviderSingleton = new ethers.JsonRpcProvider(ROBINHOOD_RPC_URL, {
-      chainId: ROBINHOOD_CHAIN_ID,
-      name: 'robinhood'
-    });
+function create1inchRobinhoodProvider(bearerToken) {
+  const fetchRequest = new FetchRequest(ROBINHOOD_1INCH_RPC_URL);
+  fetchRequest.setHeader('Authorization', `Bearer ${bearerToken}`);
+  return new ethers.JsonRpcProvider(fetchRequest, {
+    chainId: ROBINHOOD_CHAIN_ID,
+    name: 'robinhood'
+  });
+}
+
+function createPublicRobinhoodProvider() {
+  return new ethers.JsonRpcProvider(ROBINHOOD_PUBLIC_RPC_URL, {
+    chainId: ROBINHOOD_CHAIN_ID,
+    name: 'robinhood'
+  });
+}
+
+/** Prefer 1inch archive RPC when a bearer token is available; otherwise public Robinhood RPC. */
+export async function resolveRobinhoodProvider(bearerToken) {
+  if (bearerToken) {
+    try {
+      const provider = create1inchRobinhoodProvider(bearerToken);
+      await provider.getBlockNumber();
+      return { provider, error: null };
+    } catch (error) {
+      return {
+        provider: null,
+        error: formatRobinhoodError(error, '1inch Robinhood RPC failed')
+      };
+    }
   }
-  return robinhoodProviderSingleton;
+
+  try {
+    const provider = createPublicRobinhoodProvider();
+    await provider.getBlockNumber();
+    return { provider, error: null };
+  } catch (error) {
+    return {
+      provider: null,
+      error: formatRobinhoodError(error, 'Robinhood RPC failed')
+    };
+  }
+}
+
+function robinhoodTokenErrorRows(errorMessage) {
+  return Object.keys(ROBINHOOD_TOKENS).map((key) => ({
+    key,
+    label: tokenLabel(key),
+    balance: null,
+    target: null,
+    imbalanceNative: null,
+    imbalanceUsd: null,
+    percentage: 0,
+    error: errorMessage
+  }));
 }
 
 function tokenKeyForAddress(address) {
@@ -160,66 +211,108 @@ function robinhoodMtmPeriodChange(current, previous, hasFullData) {
 }
 
 /** Current Robinhood PropAMM wallet value + circuit breaker min USD threshold. */
-export async function fetchRobinhoodWalletValue() {
-  const provider = getRobinhoodProvider();
-  const circuitBreaker = new ethers.Contract(
-    ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
-    circuitBreakerAbi,
-    provider
-  );
-  const [valueRaw, minUsdRaw] = await Promise.all([
-    circuitBreaker.getWalletValue(),
-    circuitBreaker.minUSDValue()
-  ]);
-  const current = Number(valueRaw?.toString?.() ?? valueRaw);
-  const minUSDValue = Number(minUsdRaw?.toString?.() ?? minUsdRaw);
-  return {
-    current: Number.isFinite(current) ? current : null,
-    minUSDValue: Number.isFinite(minUSDValue) ? minUSDValue : null
-  };
+export async function fetchRobinhoodWalletValue(bearerToken = null) {
+  const { provider, error: rpcError } = await resolveRobinhoodProvider(bearerToken);
+  if (!provider) {
+    return { current: null, minUSDValue: null, error: rpcError };
+  }
+
+  try {
+    const circuitBreaker = new ethers.Contract(
+      ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
+      circuitBreakerAbi,
+      provider
+    );
+    const [valueRaw, minUsdRaw] = await Promise.all([
+      circuitBreaker.getWalletValue(),
+      circuitBreaker.minUSDValue()
+    ]);
+    const current = Number(valueRaw?.toString?.() ?? valueRaw);
+    const minUSDValue = Number(minUsdRaw?.toString?.() ?? minUsdRaw);
+    return {
+      current: Number.isFinite(current) ? current : null,
+      minUSDValue: Number.isFinite(minUSDValue) ? minUSDValue : null,
+      error: null
+    };
+  } catch (error) {
+    const message = formatRobinhoodError(error, 'getWalletValue failed');
+    return { current: null, minUSDValue: null, error: message };
+  }
 }
 
 /** MTM-style PnL deltas from SanityPnl `pnl()` on Robinhood chain. */
-export async function fetchRobinhoodMtmSnapshot() {
-  const provider = getRobinhoodProvider();
-  const sanityContract = new ethers.Contract(
-    ROBINHOOD_SANITY_PNL_ADDRESS,
-    sanityPnlAbi,
-    provider
-  );
+export async function fetchRobinhoodMtmSnapshot(bearerToken = null) {
+  const { provider, error: rpcError } = await resolveRobinhoodProvider(bearerToken);
+  if (!provider) {
+    return {
+      value: null,
+      change1h: null,
+      change24h: null,
+      change7d: null,
+      changeSinceJune18: null,
+      error: rpcError
+    };
+  }
 
-  const { blockNumber } = await getCurrentBlockInfo(provider);
-  const minBlock = ROBINHOOD_FIRST_BLOCK;
+  try {
+    const sanityContract = new ethers.Contract(
+      ROBINHOOD_SANITY_PNL_ADDRESS,
+      sanityPnlAbi,
+      provider
+    );
 
-  const oneHour = robinhoodHoursAgoBlock(blockNumber, 1, minBlock);
-  const twentyFourHours = robinhoodHoursAgoBlock(blockNumber, 24, minBlock);
+    const { blockNumber } = await getCurrentBlockInfo(provider);
+    const minBlock = ROBINHOOD_FIRST_BLOCK;
 
-  const [pnlNow, pnl1h, pnl24h] = await Promise.all([
-    readPnlUsd(sanityContract, blockNumber),
-    oneHour.hasFullData
-      ? readPnlUsd(sanityContract, oneHour.block)
-      : Promise.resolve(null),
-    twentyFourHours.hasFullData
-      ? readPnlUsd(sanityContract, twentyFourHours.block)
-      : Promise.resolve(null)
-  ]);
+    const oneHour = robinhoodHoursAgoBlock(blockNumber, 1, minBlock);
+    const twentyFourHours = robinhoodHoursAgoBlock(blockNumber, 24, minBlock);
+    const sevenDays = robinhoodHoursAgoBlock(blockNumber, 24 * 7, minBlock);
 
-  return {
-    value: pnlNow,
-    change1h: robinhoodMtmPeriodChange(pnlNow, pnl1h, oneHour.hasFullData),
-    change24h: robinhoodMtmPeriodChange(
-      pnlNow,
-      pnl24h,
+    const [pnlNow, pnl1h, pnl24h, pnl7d] = await Promise.all([
+      readPnlUsd(sanityContract, blockNumber),
+      oneHour.hasFullData
+        ? readPnlUsd(sanityContract, oneHour.block)
+        : Promise.resolve(null),
       twentyFourHours.hasFullData
-    ),
-    change7d: null,
-    changeSinceJune18: null
-  };
+        ? readPnlUsd(sanityContract, twentyFourHours.block)
+        : Promise.resolve(null),
+      sevenDays.hasFullData
+        ? readPnlUsd(sanityContract, sevenDays.block)
+        : Promise.resolve(null)
+    ]);
+
+    return {
+      value: pnlNow,
+      change1h: robinhoodMtmPeriodChange(pnlNow, pnl1h, oneHour.hasFullData),
+      change24h: robinhoodMtmPeriodChange(
+        pnlNow,
+        pnl24h,
+        twentyFourHours.hasFullData
+      ),
+      change7d: robinhoodMtmPeriodChange(pnlNow, pnl7d, sevenDays.hasFullData),
+      changeSinceJune18: null,
+      error: null
+    };
+  } catch (error) {
+    const message = formatRobinhoodError(error, 'Robinhood MTM fetch failed');
+    return {
+      value: null,
+      change1h: null,
+      change24h: null,
+      change7d: null,
+      changeSinceJune18: null,
+      error: message
+    };
+  }
 }
 
 /** Robinhood PropAMM wallet balances vs SanityPnl targets (WETH, Virtual, USDC). */
-export async function fetchRobinhoodTokenBalances() {
-  const provider = getRobinhoodProvider();
+export async function fetchRobinhoodTokenBalances(bearerToken = null) {
+  const { provider, error: rpcError } = await resolveRobinhoodProvider(bearerToken);
+  if (!provider) {
+    return null;
+  }
+
   const sanityContract = new ethers.Contract(
     ROBINHOOD_SANITY_PNL_ADDRESS,
     sanityPnlAbi,
@@ -250,7 +343,7 @@ export async function fetchRobinhoodTokenBalances() {
       };
     } catch (error) {
       console.warn(`Robinhood token balance fetch failed for ${key}:`, error);
-      balanceData[key] = { balance: 0, target: 0, percentage: 0 };
+      balanceData[key] = { balance: 0, target: 0, percentage: 0, error: formatRobinhoodError(error) };
     }
   }
 
@@ -258,30 +351,40 @@ export async function fetchRobinhoodTokenBalances() {
 }
 
 /** PnL circuit breaker snapshot from Robinhood SanityPnl (referencePnl, maxLoss, current loss). */
-export async function fetchRobinhoodSanityPnlCircuitBreaker() {
-  const provider = getRobinhoodProvider();
-  const sanityContract = new ethers.Contract(
-    ROBINHOOD_SANITY_PNL_ADDRESS,
-    sanityPnlAbi,
-    provider
-  );
-  const pnlFn = sanityContract.getFunction('pnl()');
-  const [referenceRaw, maxLossRaw, pnlRaw] = await Promise.all([
-    sanityContract.referencePnl(),
-    sanityContract.maxLoss(),
-    pnlFn()
-  ]);
+export async function fetchRobinhoodSanityPnlCircuitBreaker(bearerToken = null) {
+  const { provider, error: rpcError } = await resolveRobinhoodProvider(bearerToken);
+  if (!provider) {
+    return { referencePnl: null, maxAllowedLoss: null, delta: null, error: rpcError };
+  }
 
-  const referencePnl = scaleInt256ToNumber(referenceRaw);
-  const currentPnl = scaleInt256ToNumber(pnlRaw);
-  const maxB = toBigInt(maxLossRaw);
-  const scale = 1e36;
+  try {
+    const sanityContract = new ethers.Contract(
+      ROBINHOOD_SANITY_PNL_ADDRESS,
+      sanityPnlAbi,
+      provider
+    );
+    const pnlFn = sanityContract.getFunction('pnl()');
+    const [referenceRaw, maxLossRaw, pnlRaw] = await Promise.all([
+      sanityContract.referencePnl(),
+      sanityContract.maxLoss(),
+      pnlFn()
+    ]);
 
-  return {
-    referencePnl,
-    maxAllowedLoss: Number(maxB) / scale,
-    delta: currentPnl - referencePnl
-  };
+    const referencePnl = scaleInt256ToNumber(referenceRaw);
+    const currentPnl = scaleInt256ToNumber(pnlRaw);
+    const maxB = toBigInt(maxLossRaw);
+    const scale = 1e36;
+
+    return {
+      referencePnl,
+      maxAllowedLoss: Number(maxB) / scale,
+      delta: currentPnl - referencePnl,
+      error: null
+    };
+  } catch (error) {
+    const message = formatRobinhoodError(error, 'Robinhood SanityPnl fetch failed');
+    return { referencePnl: null, maxAllowedLoss: null, delta: null, error: message };
+  }
 }
 
 async function collectImbalanceTokens(provider, circuitBreaker, sanityContract) {
@@ -306,8 +409,23 @@ async function collectImbalanceTokens(provider, circuitBreaker, sanityContract) 
 }
 
 /** Current wallet value, PnL vs anchor block, and Robinhood-only imbalance snapshot. */
-export async function fetchRobinhoodSnapshot() {
-  const provider = getRobinhoodProvider();
+export async function fetchRobinhoodSnapshot(bearerToken = null) {
+  const { provider, error: rpcError } = await resolveRobinhoodProvider(bearerToken);
+  if (!provider) {
+    return {
+      blockNumber: null,
+      walletValueUsd: null,
+      walletValueError: rpcError,
+      pnlCurrentUsd: null,
+      pnlError: rpcError,
+      pnlChangeUsd: null,
+      pnlAnchorBlock: ROBINHOOD_PNL_ANCHOR_BLOCK,
+      totalImbalanceUsd: null,
+      tokens: robinhoodTokenErrorRows(rpcError),
+      rpcError
+    };
+  }
+
   const circuitBreaker = new ethers.Contract(
     ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
     circuitBreakerAbi,
@@ -319,22 +437,43 @@ export async function fetchRobinhoodSnapshot() {
     provider
   );
 
-  const { blockNumber } = await getCurrentBlockInfo(provider);
+  let blockNumber = null;
+  try {
+    ({ blockNumber } = await getCurrentBlockInfo(provider));
+  } catch (error) {
+    const message = formatRobinhoodError(error, 'Robinhood block fetch failed');
+    return {
+      blockNumber: null,
+      walletValueUsd: null,
+      walletValueError: message,
+      pnlCurrentUsd: null,
+      pnlError: message,
+      pnlChangeUsd: null,
+      pnlAnchorBlock: ROBINHOOD_PNL_ANCHOR_BLOCK,
+      totalImbalanceUsd: null,
+      tokens: robinhoodTokenErrorRows(message),
+      rpcError: message
+    };
+  }
 
   let walletValueUsd = null;
+  let walletValueError = null;
   try {
     const raw = await circuitBreaker.getWalletValue();
     walletValueUsd = Number(raw.toString());
   } catch (error) {
+    walletValueError = formatRobinhoodError(error, 'getWalletValue failed');
     console.warn('Robinhood getWalletValue failed:', error);
   }
 
   let pnlCurrentUsd = null;
   let pnlAnchorUsd = null;
+  let pnlError = null;
   try {
     pnlCurrentUsd = await readPnlUsd(sanityContract, 'latest');
     pnlAnchorUsd = await readPnlUsd(sanityContract, ROBINHOOD_PNL_ANCHOR_BLOCK);
   } catch (error) {
+    pnlError = formatRobinhoodError(error, 'pnl read failed');
     console.warn('Robinhood pnl read failed:', error);
   }
 
@@ -385,37 +524,45 @@ export async function fetchRobinhoodSnapshot() {
         target,
         imbalanceNative,
         imbalanceUsd,
-        percentage: target > 0 ? (balance / target) * 100 : 0
+        percentage: target > 0 ? (balance / target) * 100 : 0,
+        error: null
       });
     } catch (error) {
+      const key = tokenKeyForAddress(tokenAddress);
+      const message = formatRobinhoodError(error, `${tokenLabel(key)} fetch failed`);
       console.warn(`Robinhood imbalance fetch failed for ${tokenAddress}:`, error);
+      tokenRows.push({
+        key,
+        label: tokenLabel(key),
+        balance: null,
+        target: null,
+        imbalanceNative: null,
+        imbalanceUsd: null,
+        percentage: 0,
+        error: message
+      });
     }
   }
 
   const totalImbalanceUsd = tokenRows.reduce(
-    (sum, row) => sum + row.imbalanceUsd,
+    (sum, row) => sum + (row.imbalanceUsd ?? 0),
     0
   );
-
-  if (
-    walletValueUsd == null &&
-    pnlCurrentUsd == null &&
-    tokenRows.length === 0
-  ) {
-    throw new Error('Failed to load any Robinhood on-chain data');
-  }
 
   return {
     blockNumber,
     walletValueUsd,
+    walletValueError,
     pnlCurrentUsd,
+    pnlError,
     pnlChangeUsd:
       pnlCurrentUsd != null && pnlAnchorUsd != null
         ? pnlCurrentUsd - pnlAnchorUsd
         : null,
     pnlAnchorBlock: ROBINHOOD_PNL_ANCHOR_BLOCK,
     totalImbalanceUsd,
-    tokens: tokenRows
+    tokens: tokenRows,
+    rpcError: null
   };
 }
 
@@ -441,101 +588,110 @@ function toVolumeBigInt(value) {
 }
 
 /** 1h / 24h volume stats for Robinhood PropAMM (WETH + USDG). */
-export async function fetchRobinhoodVolumeStats() {
-  const provider = getRobinhoodProvider();
-  const contract = new ethers.Contract(
-    ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
-    circuitBreakerAbi,
-    provider
-  );
-
-  const { blockNumber, timestamp } = await getCurrentBlockInfo(provider);
-  const blocks = calculateBlockNumbers(blockNumber, timestamp, {
-    firstBlock: ROBINHOOD_FIRST_BLOCK,
-    blockTimeSeconds: ROBINHOOD_BLOCK_TIME_SECONDS
-  });
-
-  const volumeData = {};
-  for (const [tokenName, tokenAddress] of Object.entries(ROBINHOOD_VOLUME_TOKENS)) {
-    volumeData[tokenName] = {};
-
-    for (const [aggName, aggAddress] of Object.entries(ROBINHOOD_AGGREGATORS)) {
-      const [volumeCurrent, volume1h, volume24h] = await Promise.all([
-        readRobinhoodVolume(contract, aggAddress, tokenAddress, blocks.current),
-        readRobinhoodVolume(contract, aggAddress, tokenAddress, blocks.oneHourAgo),
-        readRobinhoodVolume(
-          contract,
-          aggAddress,
-          tokenAddress,
-          blocks.twentyFourHoursAgo
-        )
-      ]);
-
-      const currentBigInt = toVolumeBigInt(volumeCurrent);
-      const oneHourBigInt = toVolumeBigInt(volume1h);
-      const twentyFourHoursBigInt = toVolumeBigInt(volume24h);
-
-      const oneHourVolume = blocks.hasFull1hData
-        ? currentBigInt - oneHourBigInt
-        : 0n;
-      const twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
-
-      volumeData[tokenName][aggName] = {
-        oneHour: oneHourVolume.toString(),
-        twentyFourHours: twentyFourHoursVolume.toString()
-      };
-    }
+export async function fetchRobinhoodVolumeStats(bearerToken = null) {
+  const { provider, error: rpcError } = await resolveRobinhoodProvider(bearerToken);
+  if (!provider) {
+    return { error: rpcError };
   }
 
-  const perToken = {};
-  const perAggregator = Object.fromEntries(
-    Object.keys(ROBINHOOD_AGGREGATORS).map((key) => [key, {}])
-  );
+  try {
+    const contract = new ethers.Contract(
+      ROBINHOOD_CIRCUIT_BREAKER_ADDRESS,
+      circuitBreakerAbi,
+      provider
+    );
 
-  for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
-    perToken[tokenName] = {};
-    for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
-      const vol = volumeData[tokenName][aggName] || {
-        oneHour: '0',
-        twentyFourHours: '0'
-      };
-      perToken[tokenName][aggName] = {
-        oneHour: vol.oneHour,
-        twentyFourHours: vol.twentyFourHours
-      };
+    const { blockNumber, timestamp } = await getCurrentBlockInfo(provider);
+    const blocks = calculateBlockNumbers(blockNumber, timestamp, {
+      firstBlock: ROBINHOOD_FIRST_BLOCK,
+      blockTimeSeconds: ROBINHOOD_BLOCK_TIME_SECONDS
+    });
+
+    const volumeData = {};
+    for (const [tokenName, tokenAddress] of Object.entries(ROBINHOOD_VOLUME_TOKENS)) {
+      volumeData[tokenName] = {};
+
+      for (const [aggName, aggAddress] of Object.entries(ROBINHOOD_AGGREGATORS)) {
+        const [volumeCurrent, volume1h, volume24h] = await Promise.all([
+          readRobinhoodVolume(contract, aggAddress, tokenAddress, blocks.current),
+          readRobinhoodVolume(contract, aggAddress, tokenAddress, blocks.oneHourAgo),
+          readRobinhoodVolume(
+            contract,
+            aggAddress,
+            tokenAddress,
+            blocks.twentyFourHoursAgo
+          )
+        ]);
+
+        const currentBigInt = toVolumeBigInt(volumeCurrent);
+        const oneHourBigInt = toVolumeBigInt(volume1h);
+        const twentyFourHoursBigInt = toVolumeBigInt(volume24h);
+
+        const oneHourVolume = blocks.hasFull1hData
+          ? currentBigInt - oneHourBigInt
+          : 0n;
+        const twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
+
+        volumeData[tokenName][aggName] = {
+          oneHour: oneHourVolume.toString(),
+          twentyFourHours: twentyFourHoursVolume.toString()
+        };
+      }
     }
-  }
 
-  for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
+    const perToken = {};
+    const perAggregator = Object.fromEntries(
+      Object.keys(ROBINHOOD_AGGREGATORS).map((key) => [key, {}])
+    );
+
     for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
-      const data = volumeData[tokenName][aggName] || {
-        oneHour: '0',
-        twentyFourHours: '0'
-      };
-      perAggregator[aggName][tokenName] = {
-        oneHour: data.oneHour,
-        twentyFourHours: data.twentyFourHours
-      };
+      perToken[tokenName] = {};
+      for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
+        const vol = volumeData[tokenName][aggName] || {
+          oneHour: '0',
+          twentyFourHours: '0'
+        };
+        perToken[tokenName][aggName] = {
+          oneHour: vol.oneHour,
+          twentyFourHours: vol.twentyFourHours
+        };
+      }
     }
-  }
 
-  let overall1h = 0n;
-  let overall24h = 0n;
-  for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
     for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
-      const data = volumeData[tokenName][aggName];
-      overall1h += BigInt(data.oneHour);
-      overall24h += BigInt(data.twentyFourHours);
+      for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
+        const data = volumeData[tokenName][aggName] || {
+          oneHour: '0',
+          twentyFourHours: '0'
+        };
+        perAggregator[aggName][tokenName] = {
+          oneHour: data.oneHour,
+          twentyFourHours: data.twentyFourHours
+        };
+      }
     }
-  }
 
-  return {
-    perToken,
-    perAggregator,
-    overall: {
-      oneHour: overall1h.toString(),
-      twentyFourHours: overall24h.toString()
-    },
-    timeSinceFirst: blocks.timeSinceFirst
-  };
+    let overall1h = 0n;
+    let overall24h = 0n;
+    for (const tokenName of Object.keys(ROBINHOOD_VOLUME_TOKENS)) {
+      for (const aggName of Object.keys(ROBINHOOD_AGGREGATORS)) {
+        const data = volumeData[tokenName][aggName];
+        overall1h += BigInt(data.oneHour);
+        overall24h += BigInt(data.twentyFourHours);
+      }
+    }
+
+    return {
+      perToken,
+      perAggregator,
+      overall: {
+        oneHour: overall1h.toString(),
+        twentyFourHours: overall24h.toString()
+      },
+      timeSinceFirst: blocks.timeSinceFirst,
+      error: null
+    };
+  } catch (error) {
+    return { error: formatRobinhoodError(error, 'Robinhood volume fetch failed') };
+  }
 }

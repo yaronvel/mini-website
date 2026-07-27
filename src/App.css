@@ -710,6 +710,14 @@
   }
 }
 
+.robinhood-cube-error {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  margin: 0.5rem 0 0;
+  text-align: left;
+  word-break: break-word;
+}
+
 .pnl-hourly-chart-wrap {
   margin-top: 1.25rem;
   width: 100%;

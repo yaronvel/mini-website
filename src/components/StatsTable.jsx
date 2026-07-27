@@ -50,6 +50,7 @@ function formatTimePeriod(timeSinceFirst) {
 export function StatsTable({
   stats,
   loading,
+  error = null,
   title = 'Volume Statistics (only base PropAMM)',
   tokens = TOKENS,
   aggregators = AGGREGATORS,
@@ -58,11 +59,20 @@ export function StatsTable({
   tokenLabels = {}
 }) {
   // Only show loading on initial load when there's no data yet
-  if (loading && !stats) {
+  if (loading && !stats && !error) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
         <p>Loading volume data...</p>
+      </div>
+    );
+  }
+
+  if (error && !stats) {
+    return (
+      <div className="stats-container">
+        <h2>{title}</h2>
+        <p className="robinhood-error robinhood-cube-error">{error}</p>
       </div>
     );
   }

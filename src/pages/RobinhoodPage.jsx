@@ -8,6 +8,7 @@ import {
   ROBINHOOD_VOLUME_TOKENS,
   ROBINHOOD_VOLUME_TOKEN_LABELS
 } from '../utils/robinhood';
+import { useRpcToken } from '../context/RpcTokenContext';
 import '../App.css';
 
 const ROBINHOOD_BALANCE_SLOT_KEYS = ['weth', 'virtual', 'usdc'];
@@ -54,6 +55,17 @@ function valueClassName(value) {
 }
 
 function renderRobinhoodUsdcCube(row) {
+  if (row?.error) {
+    return (
+      <div key="usdc" className="token-balance-item">
+        <div className="token-balance-header">
+          <span className="token-balance-name">USDC</span>
+        </div>
+        <p className="robinhood-error robinhood-cube-error">{row.error}</p>
+      </div>
+    );
+  }
+
   const balance = row?.balance ?? 0;
   return (
     <div key="usdc" className="token-balance-item">
@@ -71,6 +83,17 @@ function renderRobinhoodUsdcCube(row) {
 }
 
 function renderRobinhoodImbalanceCube(row) {
+  if (row?.error) {
+    return (
+      <div key={row.key} className="token-balance-item">
+        <div className="token-balance-header">
+          <span className="token-balance-name">{tokenBalanceDisplayName(row.key)}</span>
+        </div>
+        <p className="robinhood-error robinhood-cube-error">{row.error}</p>
+      </div>
+    );
+  }
+
   return (
     <div key={row.key} className="token-balance-item">
       <div className="token-balance-header">
@@ -120,20 +143,24 @@ function renderRobinhoodBalanceSlot(tokenKey, tokensByKey) {
 }
 
 export function RobinhoodPage() {
+  const { bearerToken, hydrated } = useRpcToken();
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
   const [volumeStats, setVolumeStats] = useState(null);
+  const [volumeError, setVolumeError] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const hasSnapshotRef = useRef(false);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     let cancelled = false;
 
     async function refresh() {
       try {
         const [snapshotResult, volumeResult] = await Promise.allSettled([
-          fetchRobinhoodSnapshot(),
-          fetchRobinhoodVolumeStats()
+          fetchRobinhoodSnapshot(bearerToken),
+          fetchRobinhoodVolumeStats(bearerToken)
         ]);
 
         if (cancelled) return;
@@ -141,20 +168,30 @@ export function RobinhoodPage() {
         if (snapshotResult.status === 'fulfilled') {
           setSnapshot(snapshotResult.value);
           hasSnapshotRef.current = true;
-          setError(null);
+          setError(snapshotResult.value.rpcError ?? null);
         } else {
           console.warn('Robinhood snapshot fetch failed:', snapshotResult.reason);
+          const message =
+            snapshotResult.reason?.message ?? 'Failed to load Robinhood data';
           if (!hasSnapshotRef.current) {
-            setError(
-              snapshotResult.reason?.message ?? 'Failed to load Robinhood data'
-            );
+            setError(message);
           }
         }
 
         if (volumeResult.status === 'fulfilled') {
-          setVolumeStats(volumeResult.value);
+          if (volumeResult.value?.error) {
+            setVolumeStats(null);
+            setVolumeError(volumeResult.value.error);
+          } else {
+            setVolumeStats(volumeResult.value);
+            setVolumeError(null);
+          }
         } else {
           console.warn('Robinhood volume fetch failed:', volumeResult.reason);
+          setVolumeStats(null);
+          setVolumeError(
+            volumeResult.reason?.message ?? 'Failed to load Robinhood volume data'
+          );
         }
       } finally {
         if (!cancelled) {
@@ -169,11 +206,7 @@ export function RobinhoodPage() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
-
-  const tokensByKey = snapshot
-    ? Object.fromEntries(snapshot.tokens.map((row) => [row.key, row]))
-    : null;
+  }, [bearerToken, hydrated]);
 
   return (
     <div className="home-page robinhood-page">
@@ -191,21 +224,27 @@ export function RobinhoodPage() {
       )}
       {error && !snapshot && <p className="robinhood-error">{error}</p>}
 
-      {snapshot && tokensByKey && (
+      {snapshot && (
         <>
           <div className="wallet-values-grid robinhood-metrics-grid">
             <div className="wallet-value-card">
               <div className="wallet-value-main">
                 <div className="wallet-value-main-left">
                   <span className="wallet-value-label">Wallet value</span>
-                  <span className="wallet-value-amount">
-                    {snapshot.walletValueUsd != null
-                      ? `$${snapshot.walletValueUsd.toLocaleString('en-US', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}`
-                      : '—'}
-                  </span>
+                  {snapshot.walletValueError ? (
+                    <span className="wallet-value-amount robinhood-error">
+                      {snapshot.walletValueError}
+                    </span>
+                  ) : (
+                    <span className="wallet-value-amount">
+                      {snapshot.walletValueUsd != null
+                        ? `$${snapshot.walletValueUsd.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}`
+                        : '—'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -214,9 +253,15 @@ export function RobinhoodPage() {
               <div className="wallet-value-main">
                 <div className="wallet-value-main-left">
                   <span className="wallet-value-label">PnL (current)</span>
-                  <span className={`wallet-value-amount ${valueClassName(snapshot.pnlCurrentUsd)}`}>
-                    {formatUsd(snapshot.pnlCurrentUsd)}
-                  </span>
+                  {snapshot.pnlError ? (
+                    <span className="wallet-value-amount robinhood-error">
+                      {snapshot.pnlError}
+                    </span>
+                  ) : (
+                    <span className={`wallet-value-amount ${valueClassName(snapshot.pnlCurrentUsd)}`}>
+                      {formatUsd(snapshot.pnlCurrentUsd)}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -228,7 +273,10 @@ export function RobinhoodPage() {
               <h4 className="token-balances-row-title">Robinhood</h4>
               <div className="token-balances-grid token-balances-grid--aligned">
                 {ROBINHOOD_BALANCE_SLOT_KEYS.map((tokenKey) =>
-                  renderRobinhoodBalanceSlot(tokenKey, tokensByKey)
+                  renderRobinhoodBalanceSlot(
+                    tokenKey,
+                    Object.fromEntries(snapshot.tokens.map((row) => [row.key, row]))
+                  )
                 )}
               </div>
             </section>
@@ -238,7 +286,8 @@ export function RobinhoodPage() {
 
       <StatsTable
         stats={volumeStats}
-        loading={isInitialLoad && !volumeStats}
+        error={volumeError}
+        loading={isInitialLoad && !volumeStats && !volumeError}
         title="Volume Statistics (Robinhood)"
         tokens={ROBINHOOD_VOLUME_TOKENS}
         aggregators={ROBINHOOD_AGGREGATORS}
