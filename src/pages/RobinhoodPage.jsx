@@ -119,14 +119,6 @@ function renderRobinhoodBalanceSlot(tokenKey, tokensByKey) {
   return renderRobinhoodImbalanceCube(row);
 }
 
-function formatMidShift(value) {
-  if (value == null || Number.isNaN(value)) return 'NA';
-  return value.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
 export function RobinhoodPage() {
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
@@ -224,28 +216,6 @@ export function RobinhoodPage() {
                   <span className="wallet-value-label">PnL (current)</span>
                   <span className={`wallet-value-amount ${valueClassName(snapshot.pnlCurrentUsd)}`}>
                     {formatUsd(snapshot.pnlCurrentUsd)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="wallet-value-card">
-              <div className="wallet-value-main">
-                <div className="wallet-value-main-left">
-                  <span className="wallet-value-label">ETH depeg</span>
-                  <span className="wallet-value-amount">
-                    {formatMidShift(snapshot.ethDeviationBps)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="wallet-value-card">
-              <div className="wallet-value-main">
-                <div className="wallet-value-main-left">
-                  <span className="wallet-value-label">propAMM mid shift</span>
-                  <span className="wallet-value-amount">
-                    {formatMidShift(snapshot.propAmmMidShift)}
                   </span>
                 </div>
               </div>

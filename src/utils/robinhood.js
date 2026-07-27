@@ -14,10 +14,6 @@ export const ROBINHOOD_SANITY_PNL_ADDRESS =
   '0x351d0AeF16f04C3730299Da7bf898bFB9d66561E';
 export const ROBINHOOD_CIRCUIT_BREAKER_ADDRESS =
   '0xd218b2B96dA54b7B7170AfF8b99d2DF8BA6d3334';
-export const ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS =
-  '0xcC74c077852676AC11158AB0E2748AED60f6F3Ce';
-export const ROBINHOOD_PROPAMM_MID_SHIFT_CONTRACT_ADDRESS =
-  '0x7944d66C66a911b6002D581782f202106842Da08';
 export const ROBINHOOD_PNL_ANCHOR_BLOCK = ROBINHOOD_FIRST_BLOCK;
 
 export const ROBINHOOD_TOKENS = {
@@ -67,26 +63,6 @@ const QUOTE_IMPL_ABI = [
     inputs: [],
     name: 'getListedTokens',
     outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
-    stateMutability: 'view',
-    type: 'function'
-  }
-];
-
-const ETH_DEVIATION_ABI = [
-  {
-    inputs: [],
-    name: 'calcDeviation',
-    outputs: [{ internalType: 'int256', name: '', type: 'int256' }],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  }
-];
-
-const PROPAMM_MID_SHIFT_ABI = [
-  {
-    inputs: [{ internalType: 'uint256', name: 'currTime', type: 'uint256' }],
-    name: 'getSkew',
-    outputs: [{ internalType: 'int96', name: '', type: 'int96' }],
     stateMutability: 'view',
     type: 'function'
   }
@@ -308,34 +284,6 @@ export async function fetchRobinhoodSanityPnlCircuitBreaker() {
   };
 }
 
-async function readEthDeviationBps(provider) {
-  const deviationContract = new ethers.Contract(
-    ROBINHOOD_ETH_DEVIATION_CONTRACT_ADDRESS,
-    ETH_DEVIATION_ABI,
-    provider
-  );
-  const raw = await deviationContract.calcDeviation.staticCall();
-  return Number(toSignedInt256(raw));
-}
-
-function computePropAmmMidShift(skewRaw) {
-  const x = toBigInt(skewRaw);
-  const oneE18 = 10n ** 18n;
-  const oneE4 = 10n ** 4n;
-  const scaled = ((x - oneE18) * oneE4 * 100n) / oneE18;
-  return Number(scaled) / 100;
-}
-
-async function readPropAmmMidShift(provider, currTimeSeconds) {
-  const skewContract = new ethers.Contract(
-    ROBINHOOD_PROPAMM_MID_SHIFT_CONTRACT_ADDRESS,
-    PROPAMM_MID_SHIFT_ABI,
-    provider
-  );
-  const skewRaw = await skewContract.getSkew(currTimeSeconds);
-  return computePropAmmMidShift(skewRaw);
-}
-
 async function collectImbalanceTokens(provider, circuitBreaker, sanityContract) {
   const quoteAddress = await circuitBreaker.quoteImpl();
   const quoteContract = new ethers.Contract(
@@ -371,25 +319,7 @@ export async function fetchRobinhoodSnapshot() {
     provider
   );
 
-  const { blockNumber, timestamp } = await getCurrentBlockInfo(provider);
-  const currTimeSeconds =
-    timestamp && timestamp > 0
-      ? timestamp
-      : Math.floor(Date.now() / 1000);
-
-  let ethDeviationBps = null;
-  try {
-    ethDeviationBps = await readEthDeviationBps(provider);
-  } catch (error) {
-    console.warn('Robinhood calcDeviation failed:', error);
-  }
-
-  let propAmmMidShift = null;
-  try {
-    propAmmMidShift = await readPropAmmMidShift(provider, currTimeSeconds);
-  } catch (error) {
-    console.warn('Robinhood getSkew failed:', error);
-  }
+  const { blockNumber } = await getCurrentBlockInfo(provider);
 
   let walletValueUsd = null;
   try {
@@ -477,8 +407,6 @@ export async function fetchRobinhoodSnapshot() {
 
   return {
     blockNumber,
-    ethDeviationBps,
-    propAmmMidShift,
     walletValueUsd,
     pnlCurrentUsd,
     pnlChangeUsd:
