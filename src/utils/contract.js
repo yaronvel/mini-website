@@ -288,9 +288,30 @@ export const AGGREGATORS = {
   liquidMesh: '0xf5ae73ca5ed58a30886b88e74d0ba1931d315a8c',
   rebalance: '0xe55aDbd4a21616C4A5936B5C7e99bf43afaeb298',
   bitget: '0x184a53FAe631f477B57E8319c7aedb42d98b8635',
-  paraSwap1: '0x6a000f20005980200259b80c5102003040001068',
-  paraSwap2: '0x0000000000bbf5c5fd284e657f01bd000933c96d'
+  paraSwap: 'paraSwap'
 };
+
+/** Base ParaSwap volume dest addresses — summed in volume stats. */
+export const PARASWAP_VOLUME_DESTS = [
+  '0x6a000f20005980200259b80c5102003040001068',
+  '0x0000000000bbf5c5fd284e657f01bd000933c96d',
+  '0x006d0e0d006109f0020f3050000a713780b7b000',
+  '0x082738d007001080a00099a000004f3006152085',
+  '0xa000b020c290d000020aac04026b5306d60050f0'
+];
+
+const MULTI_ADDRESS_AGGREGATOR_DESTS = {
+  paraSwap: PARASWAP_VOLUME_DESTS
+};
+
+/** Volume dest addresses for a Base aggregator (single- or multi-address). */
+export function getAggregatorVolumeDests(aggName) {
+  if (MULTI_ADDRESS_AGGREGATOR_DESTS[aggName]) {
+    return MULTI_ADDRESS_AGGREGATOR_DESTS[aggName];
+  }
+  const address = AGGREGATORS[aggName];
+  return address ? [address] : [];
+}
 
 export const AGGREGATOR_DISPLAY_NAMES = {
   kyberSwap: 'Kyber Swap',
@@ -307,8 +328,7 @@ export const AGGREGATOR_DISPLAY_NAMES = {
   liquidMesh: 'LiquidMesh',
   rebalance: 'Rebalance',
   bitget: 'Bitget',
-  paraSwap1: 'ParaSwap1',
-  paraSwap2: 'ParaSwap2'
+  paraSwap: 'ParaSwap'
 };
 
 // USDC has 6 decimals, so divide by 1e6 to get human-readable number

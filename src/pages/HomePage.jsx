@@ -23,6 +23,7 @@ import {
   fetchMtmHourlySeries,
   TOKENS,
   AGGREGATORS,
+  getAggregatorVolumeDests,
   USDC_DIVISOR,
   FIRST_BLOCK,
   PNL_ANCHOR_BLOCK,
@@ -1212,71 +1213,80 @@ export function HomePage() {
       for (const [tokenName, tokenAddress] of Object.entries(TOKENS)) {
         volumeData[tokenName] = {};
 
-        for (const [aggName, aggAddress] of Object.entries(AGGREGATORS)) {
-          // Read volume at different block heights with retry logic
-          const readVolume = async (blockTag, retries = 3) => {
-            for (let attempt = 1; attempt <= retries; attempt++) {
-              try {
-                const result = await contract.volume(aggAddress, tokenAddress, { blockTag });
-                return result;
-              } catch (error) {
-                if (attempt === retries) {
-                  // Final attempt failed, return 0 (no volume data at that block)
-                  console.warn(`Volume call reverted at block ${blockTag} for ${tokenName}/${aggName} after ${retries} attempts`);
-                  return 0n;
-                }
-                // Wait before retrying (exponential backoff)
-                await new Promise(resolve => setTimeout(resolve, attempt * 100));
+        const readVolume = async (aggAddress, blockTag, retries = 3) => {
+          for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+              const result = await contract.volume(aggAddress, tokenAddress, { blockTag });
+              return result;
+            } catch (error) {
+              if (attempt === retries) {
+                console.warn(
+                  `Volume call reverted at block ${blockTag} for ${tokenName}/${aggAddress} after ${retries} attempts`
+                );
+                return 0n;
               }
+              await new Promise((resolve) => setTimeout(resolve, attempt * 100));
             }
-            return 0n;
-          };
+          }
+          return 0n;
+        };
 
-          // Read volumes at all block heights
+        const readVolumeSum = async (aggName, blockTag) => {
+          const aggAddresses = getAggregatorVolumeDests(aggName);
+          const volumes = await Promise.all(
+            aggAddresses.map((aggAddress) => readVolume(aggAddress, blockTag))
+          );
+          return volumes.reduce((sum, volume) => {
+            const value = typeof volume === 'bigint' ? volume : BigInt(volume.toString());
+            return sum + value;
+          }, 0n);
+        };
+
+        for (const aggName of Object.keys(AGGREGATORS)) {
           const [volumeCurrent, volume1h, volume24h] = await Promise.all([
-            readVolume(blocks.current),
-            readVolume(blocks.oneHourAgo),
-            readVolume(blocks.twentyFourHoursAgo)
+            readVolumeSum(aggName, blocks.current),
+            readVolumeSum(aggName, blocks.oneHourAgo),
+            readVolumeSum(aggName, blocks.twentyFourHoursAgo)
           ]);
 
-          // Debug: Print raw values from contract first
+          const currentBigInt =
+            typeof volumeCurrent === 'bigint' ? volumeCurrent : BigInt(volumeCurrent.toString());
+          const oneHourBigInt =
+            typeof volume1h === 'bigint' ? volume1h : BigInt(volume1h.toString());
+          const twentyFourHoursBigInt =
+            typeof volume24h === 'bigint' ? volume24h : BigInt(volume24h.toString());
+
           console.log(`[${tokenName}/${aggName}] Raw Volume Values from Contract:`);
           console.log(`  volumeCurrent (raw):`, volumeCurrent, `type:`, typeof volumeCurrent);
           console.log(`  volume1h (raw):`, volume1h, `type:`, typeof volume1h);
           console.log(`  volume24h (raw):`, volume24h, `type:`, typeof volume24h);
 
-          // Convert to BigInt for calculations
-          const currentBigInt = typeof volumeCurrent === 'bigint' ? volumeCurrent : BigInt(volumeCurrent.toString());
-          const oneHourBigInt = typeof volume1h === 'bigint' ? volume1h : BigInt(volume1h.toString());
-          const twentyFourHoursBigInt = typeof volume24h === 'bigint' ? volume24h : BigInt(volume24h.toString());
-
-          // Debug: Print block numbers and volumes for all time periods
           console.log(`[${tokenName}/${aggName}] Volume Stats Block Comparison:`);
           console.log(`  Current block: ${blocks.current}`);
           console.log(`  Volume at current block (${blocks.current}): ${currentBigInt.toString()}`);
           console.log(`  1h ago block: ${blocks.oneHourAgo}`);
           console.log(`  Volume at 1h ago block (${blocks.oneHourAgo}): ${oneHourBigInt.toString()}`);
           console.log(`  24h ago block: ${blocks.twentyFourHoursAgo}`);
-          console.log(`  Volume at 24h ago block (${blocks.twentyFourHoursAgo}): ${twentyFourHoursBigInt.toString()}`);
+          console.log(
+            `  Volume at 24h ago block (${blocks.twentyFourHoursAgo}): ${twentyFourHoursBigInt.toString()}`
+          );
           console.log(`  First block: ${blocks.first}`);
-          console.log(`  Blocks difference (current - 24h ago): ${blocks.current - blocks.twentyFourHoursAgo}`);
+          console.log(
+            `  Blocks difference (current - 24h ago): ${blocks.current - blocks.twentyFourHoursAgo}`
+          );
           console.log(`  Expected blocks in 24h: ${(3600 / 2) * 24} (43200)`);
-          console.log(`  Blocks difference (current - 1h ago): ${blocks.current - blocks.oneHourAgo}`);
+          console.log(
+            `  Blocks difference (current - 1h ago): ${blocks.current - blocks.oneHourAgo}`
+          );
           console.log(`  Expected blocks in 1h: ${3600 / 2} (1800)`);
 
-          // Calculate differences (volume in the time period)
-          // For 1h: use 1h ago block if we have full 1h data, otherwise 0
           let oneHourVolume;
           if (blocks.hasFull1hData) {
-            // More than 1h has passed, calculate volume from 1h ago to now
             oneHourVolume = currentBigInt - oneHourBigInt;
           } else {
-            // Less than 1h has passed since first block, can't calculate 1h stats
             oneHourVolume = 0n;
           }
 
-          // For 24h stats: always calculate volume from 24h ago block to now
-          // The blocks.twentyFourHoursAgo is already calculated correctly (max of calculated 24h ago or first block)
           let twentyFourHoursVolume = currentBigInt - twentyFourHoursBigInt;
           console.log(`  Calculated 24h volume: ${twentyFourHoursVolume.toString()}`);
 
