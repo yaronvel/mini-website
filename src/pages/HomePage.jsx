@@ -17,6 +17,7 @@ import {
   fetchVtWalletBalances,
   buildVtTokenBalancesSnapshot,
   fetchVtWalletUsdcBalance,
+  fetchVtWalletEurocBalance,
   buildGlobalTokenBalancesSnapshot,
   applyRobinhoodWethTargetToGlobal,
   fetchMtmSnapshot,
@@ -45,6 +46,7 @@ function tokenBalanceDisplayName(tokenName) {
   if (tokenName === 'virtual') return 'Virtual';
   if (tokenName === 'cbbtc') return 'CBBTC';
   if (tokenName === 'wbtc') return 'WBTC';
+  if (tokenName === 'euroc') return 'EUROC';
   return tokenName.toUpperCase();
 }
 
@@ -103,22 +105,24 @@ function renderTokenBalanceCube(tokenName, data, displayNameOverride) {
   );
 }
 
-const BASE_BALANCE_SLOT_KEYS = ['weth', 'cbbtc', 'virtual', 'usdc'];
+const BASE_BALANCE_SLOT_KEYS = ['weth', 'cbbtc', 'virtual', 'usdc', 'euroc'];
 
-/** Mainnet cubes align under Base columns: weth, cbbtc→wbtc, virtual hole, usdc. */
+/** Mainnet cubes align under Base columns: weth, cbbtc→wbtc, virtual hole, usdc, euroc hole. */
 const MAINNET_BALANCE_SLOTS = [
   { column: 'weth', tokenKey: 'weth' },
   { column: 'cbbtc', tokenKey: 'wbtc' },
   { column: 'virtual', tokenKey: null },
-  { column: 'usdc', tokenKey: 'usdc' }
+  { column: 'usdc', tokenKey: 'usdc' },
+  { column: 'euroc', tokenKey: null }
 ];
 
-/** VT row: weth, cbbtc, virtual, usdc aligned with Base columns. */
+/** VT row: weth, cbbtc, virtual, usdc, euroc aligned with Base columns. */
 const VT_BALANCE_SLOTS = [
   { column: 'weth', tokenKey: 'weth' },
   { column: 'cbbtc', tokenKey: 'cbbtc' },
   { column: 'virtual', tokenKey: 'virtual' },
-  { column: 'usdc', tokenKey: 'usdc' }
+  { column: 'usdc', tokenKey: 'usdc' },
+  { column: 'euroc', tokenKey: 'euroc' }
 ];
 
 function renderBaseTokenBalanceCube(tokenName, data) {
@@ -139,7 +143,7 @@ function renderBaseTokenBalanceCube(tokenName, data) {
             })}
           </span>
         </div>
-        {tokenName !== 'usdc' && data.rebalanceOffset != null && (
+        {tokenName !== 'usdc' && tokenName !== 'euroc' && data.rebalanceOffset != null && (
           <div className="token-balance-row">
             <span className="token-balance-label">Rebalance offset:</span>
             <span className="token-balance-value">
@@ -173,12 +177,13 @@ function renderBaseTokenBalanceCube(tokenName, data) {
   );
 }
 
-/** Robinhood cubes align under Base columns: weth, cbbtc hole, virtual, usdc. */
+/** Robinhood cubes align under Base columns: weth, cbbtc hole, virtual, usdc, euroc hole. */
 const ROBINHOOD_BALANCE_SLOTS = [
   { column: 'weth', tokenKey: 'weth' },
   { column: 'cbbtc', tokenKey: null },
   { column: 'virtual', tokenKey: 'virtual' },
-  { column: 'usdc', tokenKey: 'usdc' }
+  { column: 'usdc', tokenKey: 'usdc' },
+  { column: 'euroc', tokenKey: null }
 ];
 
 function renderRobinhoodUsdcBalanceCube(data) {
@@ -621,6 +626,7 @@ export function HomePage() {
     return buildVtTokenBalancesSnapshot(
       vtWalletInputs.vtBalances,
       vtWalletInputs.vtUsdcBalance,
+      vtWalletInputs.vtEurocBalance,
       displayGlobalTokenBalances
     );
   }, [vtWalletInputs, displayGlobalTokenBalances, vtTokenBalances]);
@@ -806,13 +812,17 @@ export function HomePage() {
       try {
         if (mainnetBalancesData) {
           const vtBalances = await fetchVtWalletBalances(provider);
-          const vtUsdcBalance = await fetchVtWalletUsdcBalance(provider);
-          setVtWalletInputs({ vtBalances, vtUsdcBalance });
+          const [vtUsdcBalance, vtEurocBalance] = await Promise.all([
+            fetchVtWalletUsdcBalance(provider),
+            fetchVtWalletEurocBalance(provider)
+          ]);
+          setVtWalletInputs({ vtBalances, vtUsdcBalance, vtEurocBalance });
           const vtForGlobal = {
             weth: { balance: vtBalances.weth },
             cbbtc: { balance: vtBalances.cbbtc },
             virtual: { balance: vtBalances.virtual },
-            usdc: { balance: vtUsdcBalance }
+            usdc: { balance: vtUsdcBalance },
+            euroc: { balance: vtEurocBalance }
           };
           const globalSnapshot = buildGlobalTokenBalancesSnapshot(
             balanceData,
@@ -822,6 +832,7 @@ export function HomePage() {
           const vtSnapshot = buildVtTokenBalancesSnapshot(
             vtBalances,
             vtUsdcBalance,
+            vtEurocBalance,
             globalSnapshot
           );
           setVtTokenBalances(vtSnapshot);

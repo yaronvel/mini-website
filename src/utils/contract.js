@@ -81,7 +81,8 @@ export const TOKENS = {
   weth: '0x4200000000000000000000000000000000000006',
   cbbtc: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
   virtual: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b',
-  usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' // Base USDC
+  usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base USDC
+  euroc: '0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42'
 };
 
 // Token decimals
@@ -89,7 +90,8 @@ export const TOKEN_DECIMALS = {
   weth: 18,
   cbbtc: 8,
   virtual: 18,
-  usdc: 6
+  usdc: 6,
+  euroc: 6
 };
 
 // Target balance contract address
@@ -1065,7 +1067,8 @@ export const VT_FIXED_TARGETS = {
   weth: GLOBAL_WETH_VT_TARGET_ETH,
   cbbtc: 1.1,
   virtual: 4744,
-  usdc: 0
+  usdc: 0,
+  euroc: 0
 };
 
 function vtTokenBalanceEntry(balance, desiredBalance, fixedTarget) {
@@ -1079,7 +1082,12 @@ function vtTokenBalanceEntry(balance, desiredBalance, fixedTarget) {
 }
 
 /** VT desired balance = vt balance + global target - global balance. */
-export function buildVtTokenBalancesSnapshot(vtBalances, vtUsdcBalance, globalBalances) {
+export function buildVtTokenBalancesSnapshot(
+  vtBalances,
+  vtUsdcBalance,
+  vtEurocBalance,
+  globalBalances
+) {
   const desiredBalance = (vtBalance, globalToken) =>
     vtBalance + globalToken.target - globalToken.balance;
 
@@ -1103,17 +1111,32 @@ export function buildVtTokenBalancesSnapshot(vtBalances, vtUsdcBalance, globalBa
       vtUsdcBalance,
       desiredBalance(vtUsdcBalance, globalBalances.usdc),
       VT_FIXED_TARGETS.usdc
+    ),
+    euroc: vtTokenBalanceEntry(
+      vtEurocBalance,
+      desiredBalance(vtEurocBalance, globalBalances.euroc),
+      VT_FIXED_TARGETS.euroc
     )
   };
 }
 
 /** VT wallet USDC balance on Base (included in Global row; target fixed at 0). */
 export async function fetchVtWalletUsdcBalance(provider) {
-  const tokenContract = new ethers.Contract(TOKENS.usdc, ERC20_ABI, provider);
+  return fetchVtWalletListedTokenBalance(provider, 'usdc');
+}
+
+/** VT wallet EUROC balance on Base (included in Global row; target fixed at 0). */
+export async function fetchVtWalletEurocBalance(provider) {
+  return fetchVtWalletListedTokenBalance(provider, 'euroc');
+}
+
+async function fetchVtWalletListedTokenBalance(provider, tokenKey) {
+  const tokenContract = new ethers.Contract(TOKENS[tokenKey], ERC20_ABI, provider);
   const balance = await tokenContract.balanceOf(VT_WALLET_ADDRESS).catch(() => 0n);
   const balanceBigInt =
     typeof balance === 'bigint' ? balance : BigInt(balance.toString());
-  return Number(balanceBigInt) / Number(USDC_DIVISOR);
+  const divisor = 10n ** BigInt(TOKEN_DECIMALS[tokenKey]);
+  return Number(balanceBigInt) / Number(divisor);
 }
 
 /** Global row: summed balances; targets from Base + Mainnet constants (excludes VT). */
@@ -1144,11 +1167,14 @@ export function buildGlobalTokenBalancesSnapshot(
   const usdcBalance =
     baseBalances.usdc.balance + mainnetBalances.usdc.balance + vtBalances.usdc.balance;
 
+  const eurocBalance = baseBalances.euroc.balance + (vtBalances.euroc?.balance ?? 0);
+
   return {
     weth: tokenBalanceEntry(wethBalance, wethTarget),
     cbbtc: tokenBalanceEntry(btcBalance, btcTarget),
     virtual: tokenBalanceEntry(virtualBalance, virtualTarget),
-    usdc: tokenBalanceEntry(usdcBalance, 0)
+    usdc: tokenBalanceEntry(usdcBalance, 0),
+    euroc: tokenBalanceEntry(eurocBalance, 0)
   };
 }
 
