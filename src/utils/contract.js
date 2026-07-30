@@ -158,18 +158,23 @@ export const CIRCUIT_BREAKER_VIEW_ONLY_ABI = [
   }
 ];
 
-/** Base PropAMM MTM token order (cbbtc, weth, virtual) — matches on-chain getPnl usage. */
+/** Base PropAMM MTM token order (cbbtc, weth, virtual, euroc) — matches on-chain getPnl usage. */
 export const BASE_PROP_AMM_MTM_LISTED_TOKENS = [
   TOKENS.cbbtc,
   TOKENS.weth,
-  TOKENS.virtual
+  TOKENS.virtual,
+  TOKENS.euroc
 ];
 
 export const BASE_PROP_AMM_MTM_TARGETS = [
   ethers.parseUnits('1.5', TOKEN_DECIMALS.cbbtc),
   ethers.parseUnits('55', TOKEN_DECIMALS.weth),
-  ethers.parseUnits('10000', TOKEN_DECIMALS.virtual)
+  ethers.parseUnits('10000', TOKEN_DECIMALS.virtual),
+  ethers.parseUnits('5000', TOKEN_DECIMALS.euroc)
 ];
+
+/** After this Base block, PropAMM MTM includes EUROC in getPnl listed tokens. */
+export const BASE_PROP_AMM_MTM_EUROC_START_BLOCK = 49322696;
 
 export const BASE_PROP_AMM_MTM_USDC_TARGET = ethers.parseUnits('186706', TOKEN_DECIMALS.usdc);
 
@@ -528,18 +533,35 @@ function mtmPeriodChange(current, previous, hasFullData) {
     : null;
 }
 
+function basePropAmmMtmListedTokensAndTargets(blockNumber) {
+  if (blockNumber > BASE_PROP_AMM_MTM_EUROC_START_BLOCK) {
+    return {
+      listedTokens: BASE_PROP_AMM_MTM_LISTED_TOKENS,
+      targets: BASE_PROP_AMM_MTM_TARGETS
+    };
+  }
+  return {
+    listedTokens: BASE_PROP_AMM_MTM_LISTED_TOKENS.slice(0, 3),
+    targets: BASE_PROP_AMM_MTM_TARGETS.slice(0, 3)
+  };
+}
+
 async function readPropAmmMtmAtBlock(
   chainLabel,
   baseView,
   walletAddress,
-  blockTag
+  blockTag,
+  baseProvider
 ) {
+  const blockNumber = await resolveBlockNumber(baseProvider, blockTag);
+  const { listedTokens, targets } =
+    basePropAmmMtmListedTokensAndTargets(blockNumber);
   return readMtmPnl(
     chainLabel,
     baseView,
     walletAddress,
-    BASE_PROP_AMM_MTM_LISTED_TOKENS,
-    BASE_PROP_AMM_MTM_TARGETS,
+    listedTokens,
+    targets,
     BASE_PROP_AMM_MTM_USDC_TARGET,
     blockTag
   );
@@ -707,18 +729,48 @@ export async function fetchMtmSnapshot(bearerToken, basePropAmmWalletAddress) {
     fees7d,
     feesSinceJune18
   ] = await Promise.all([
-    readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseBlockNow),
+    readPropAmmMtmAtBlock(
+      'base',
+      baseView,
+      basePropAmmWalletAddress,
+      baseBlockNow,
+      baseProvider
+    ),
     baseOneHour.hasFullData
-      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseOneHour.block)
+      ? readPropAmmMtmAtBlock(
+          'base',
+          baseView,
+          basePropAmmWalletAddress,
+          baseOneHour.block,
+          baseProvider
+        )
       : Promise.resolve(null),
     baseTwentyFourHours.hasFullData
-      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseTwentyFourHours.block)
+      ? readPropAmmMtmAtBlock(
+          'base',
+          baseView,
+          basePropAmmWalletAddress,
+          baseTwentyFourHours.block,
+          baseProvider
+        )
       : Promise.resolve(null),
     baseSevenDays.hasFullData
-      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseSevenDays.block)
+      ? readPropAmmMtmAtBlock(
+          'base',
+          baseView,
+          basePropAmmWalletAddress,
+          baseSevenDays.block,
+          baseProvider
+        )
       : Promise.resolve(null),
     baseSinceJune18.hasFullData
-      ? readPropAmmMtmAtBlock('base', baseView, basePropAmmWalletAddress, baseSinceJune18.block)
+      ? readPropAmmMtmAtBlock(
+          'base',
+          baseView,
+          basePropAmmWalletAddress,
+          baseSinceJune18.block,
+          baseProvider
+        )
       : Promise.resolve(null),
     readVtMtmAtBlock(baseView, baseBlockNow, baseProvider),
     baseOneHour.hasFullData
@@ -867,7 +919,8 @@ export async function fetchMtmHourlySeries(bearerToken, basePropAmmWalletAddress
           'base',
           baseView,
           basePropAmmWalletAddress,
-          snap.block
+          snap.block,
+          baseProvider
         ),
         readVtMtmAtBlock(baseView, snap.block, baseProvider),
         readMainnetMtmAtBlock(mainnetView, mainnetBlocks[idx]),
@@ -1178,7 +1231,7 @@ export function buildGlobalTokenBalancesSnapshot(
   };
 }
 
-/** Add Robinhood PropAMM balances into the Global row (targets already in global fixed targets). */
+/** Add Robinhood PropAMM balances and targets into the Global row. */
 export function applyRobinhoodWethTargetToGlobal(globalBalances, robinhoodBalances) {
   if (!globalBalances || !robinhoodBalances) return globalBalances;
 
@@ -1188,7 +1241,7 @@ export function applyRobinhoodWethTargetToGlobal(globalBalances, robinhoodBalanc
     if (!globalBalances[key] || !robinhoodBalances[key]) continue;
     next[key] = tokenBalanceEntry(
       globalBalances[key].balance + robinhoodBalances[key].balance,
-      globalBalances[key].target
+      globalBalances[key].target + robinhoodBalances[key].target
     );
   }
 
