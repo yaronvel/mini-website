@@ -1174,7 +1174,7 @@ export function buildGlobalTokenBalancesSnapshot(
     cbbtc: tokenBalanceEntry(btcBalance, btcTarget),
     virtual: tokenBalanceEntry(virtualBalance, virtualTarget),
     usdc: tokenBalanceEntry(usdcBalance, 0),
-    euroc: tokenBalanceEntry(eurocBalance, 0)
+    euroc: tokenBalanceEntry(eurocBalance, baseBalances.euroc.target)
   };
 }
 
