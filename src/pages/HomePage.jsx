@@ -313,7 +313,7 @@ const MTM_WALLET_CONFIGS = [
       { label: 'cbBTC', value: 1.5 },
       { label: 'WETH', value: 55 },
       { label: 'Virtual', value: 10000 },
-      { label: 'EUROC', value: 5000 }
+      { label: 'EUROC', value: 20000 }
     ]
   },
   {

@@ -170,11 +170,24 @@ export const BASE_PROP_AMM_MTM_TARGETS = [
   ethers.parseUnits('1.5', TOKEN_DECIMALS.cbbtc),
   ethers.parseUnits('55', TOKEN_DECIMALS.weth),
   ethers.parseUnits('10000', TOKEN_DECIMALS.virtual),
-  ethers.parseUnits('5000', TOKEN_DECIMALS.euroc)
+  ethers.parseUnits('20000', TOKEN_DECIMALS.euroc)
 ];
 
 /** After this Base block, PropAMM MTM includes EUROC in getPnl listed tokens. */
 export const BASE_PROP_AMM_MTM_EUROC_START_BLOCK = 49322696;
+
+/** From this Base block onward, PropAMM MTM EUROC target is 20k (before: 5k). */
+export const BASE_PROP_AMM_MTM_EUROC_20K_TARGET_START_BLOCK = 49350435;
+
+const BASE_PROP_AMM_MTM_TARGETS_PRE_EUROC = BASE_PROP_AMM_MTM_TARGETS.slice(0, 3);
+const BASE_PROP_AMM_MTM_EUROC_TARGET_5K = ethers.parseUnits(
+  '5000',
+  TOKEN_DECIMALS.euroc
+);
+const BASE_PROP_AMM_MTM_EUROC_TARGET_20K = ethers.parseUnits(
+  '20000',
+  TOKEN_DECIMALS.euroc
+);
 
 export const BASE_PROP_AMM_MTM_USDC_TARGET = ethers.parseUnits('186706', TOKEN_DECIMALS.usdc);
 
@@ -534,15 +547,21 @@ function mtmPeriodChange(current, previous, hasFullData) {
 }
 
 function basePropAmmMtmListedTokensAndTargets(blockNumber) {
-  if (blockNumber > BASE_PROP_AMM_MTM_EUROC_START_BLOCK) {
+  if (blockNumber <= BASE_PROP_AMM_MTM_EUROC_START_BLOCK) {
     return {
-      listedTokens: BASE_PROP_AMM_MTM_LISTED_TOKENS,
-      targets: BASE_PROP_AMM_MTM_TARGETS
+      listedTokens: BASE_PROP_AMM_MTM_LISTED_TOKENS.slice(0, 3),
+      targets: BASE_PROP_AMM_MTM_TARGETS_PRE_EUROC
     };
   }
+
+  const eurocTarget =
+    blockNumber >= BASE_PROP_AMM_MTM_EUROC_20K_TARGET_START_BLOCK
+      ? BASE_PROP_AMM_MTM_EUROC_TARGET_20K
+      : BASE_PROP_AMM_MTM_EUROC_TARGET_5K;
+
   return {
-    listedTokens: BASE_PROP_AMM_MTM_LISTED_TOKENS.slice(0, 3),
-    targets: BASE_PROP_AMM_MTM_TARGETS.slice(0, 3)
+    listedTokens: BASE_PROP_AMM_MTM_LISTED_TOKENS,
+    targets: [...BASE_PROP_AMM_MTM_TARGETS_PRE_EUROC, eurocTarget]
   };
 }
 
